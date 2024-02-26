@@ -1,0 +1,8 @@
+<launch>
+    <!-- Launch the rospy node -->
+    <node name="ros_invariants_calculation" pkg="ros_invariants_py" type="ros_invariants_calculation.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+</launch>
+
