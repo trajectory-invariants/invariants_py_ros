@@ -11,3 +11,8 @@ It shows how invariants_py can be used in a ROS application for:
 TODO
 
 # Quickstart
+
+```shell
+roslaunch ros_invariants_py launch_invars_calc.launch
+```
+
