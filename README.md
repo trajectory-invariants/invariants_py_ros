@@ -43,10 +43,10 @@ rosbag play -l data/....bag
 ```
 
 TODO
-- [ ] include window building
+- [ ] build_time_window // build_progress_window 
 - [ ] include a bag file: check etasl_invariants_integration or contour_progress_estimation
-- [ ] visualization in rviz or rqt graph
+- [ ] visualization results in rviz or rqt graph
 
 ## Trajectory generation
 
-TODO
+TODO after invariants calculation is finished
