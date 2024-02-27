@@ -7,7 +7,9 @@ There are two main functionalities:
 
 # Installation
 
-ROS Noetic on Ubuntu 20.04 is assumed to be installed. Other versions of ROS/Ubuntu should work as well. A catkin workspace (`~/catkin_ws`) is assumed to be created.
+Dependencies:
+- ROS Noetic on Ubuntu 20.04 is assumed to be installed. Other versions of ROS/Ubuntu should work as well. A catkin workspace is assumed to be created (e.g. `~/catkin_ws`).
+- [invariants_py](https://github.com/trajectory-invariants/invariants_py) is assumed to be installed in your Python environment.
 
 Clone the [ros_invariants_py](https://gitlab.kuleuven.be/robotgenskill/ros-packages/ros_invariants_py) repository into your workspace:
 ```shell
