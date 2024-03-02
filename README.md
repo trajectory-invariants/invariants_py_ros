@@ -11,10 +11,10 @@ Dependencies:
 - ROS Noetic on Ubuntu 20.04 is assumed to be installed. Other versions of ROS/Ubuntu should work as well. A catkin workspace is assumed to be created (e.g. `~/catkin_ws`).
 - [invariants_py](https://github.com/trajectory-invariants/invariants_py) is assumed to be installed in your Python environment.
 
-Clone the [ros_invariants_py](https://gitlab.kuleuven.be/robotgenskill/ros-packages/ros_invariants_py) repository into your workspace:
+Clone the [invariants_py_ros](https://gitlab.kuleuven.be/robotgenskill/ros-packages/invariants_py_ros) repository into your workspace:
 ```shell
 cd ~/catkin_ws/src
-git clone https://gitlab.kuleuven.be/robotgenskill/ros-packages/ros_invariants_py
+git clone https://gitlab.kuleuven.be/robotgenskill/ros-packages/invariants_py_ros
 ```
 
 Build the package and source the workspace:
@@ -33,7 +33,7 @@ The invariants calculation node assumes that trajectory data is being streamed o
 The node can be launched using:
 
 ```shell
-roslaunch ros_invariants_py launch_invars_calc.launch
+roslaunch invariants_py_ros launch_invars_calc.launch
 ```
 
 To test the calculation you can try using prerecorded data from the following [bagfile](https://wiki.ros.org/rosbag):
