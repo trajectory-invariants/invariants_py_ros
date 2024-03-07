@@ -52,8 +52,11 @@ Suggested improvements:
 -- put results on ROS topics and make an additional ROS node that plots the data in Python
 -- put results on ROS topics and use RQTgraph and/or rviz
 
-Example of vizualization in rviz (black = estimated trajectory of the measured object inside window of OCP, axes = current pose measurement but only the position is being used now).
+Quick first test of vizualization in rviz (black = estimated trajectory of the measured object inside window of OCP, axes = current pose measurement but only the position is being used now).
+
 ![screenshot rviz](data/screenshot_rviz_trajectory.png)
+
+The estimated trajectory is always trailing behind the measurement as expected. There is a small delay between measurement and window, to be checked (note that invariants component is limited to 20 Hz).
 
 ### Online trajectory generation
 
