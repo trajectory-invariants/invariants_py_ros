@@ -46,11 +46,14 @@ rosbag play -l -r 0.5 data/example_pose_data.bag
 
 Suggested improvements:
 
-- Only the position data is being used currently. Extend the code so that invariants for rotation are included
+- Only the position data is being used currently. Extend the code so that invariants for rotation are included. To deal with pose messages check the etasl_invariants_integration repository in ERC/python_projects
 - The invariants are now time-based using a window of measurements wrt time. How would you obtain time-invariance, a.k.a. geometric invariants that are defined w.r.t. a certain progress variable? 
 - Options to visualize results:
 -- put results on ROS topics and make an additional ROS node that plots the data in Python
 -- put results on ROS topics and use RQTgraph and/or rviz
+
+Example of vizualization in rviz (black = estimated trajectory of the measured object inside window of OCP, axes = current pose measurement but only the position is being used now).
+![screenshot rviz](data/screenshot_rviz_trajectory.png)
 
 ### Online trajectory generation
 

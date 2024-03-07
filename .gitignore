@@ -1,2 +1,4 @@
 .spyproject
 foobar/
+.vscode
+*.pyc
