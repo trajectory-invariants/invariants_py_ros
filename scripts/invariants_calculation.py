@@ -13,7 +13,7 @@ from nav_msgs.msg import Path
 class ROSInvariantsCalculation:
     def __init__(self):
         rospy.init_node('ros_invariants_calculation', anonymous=True)
-        self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
+        self.update_rate = rospy.Rate(30)  # Set the ROS node update rate (Default: 20 Hz)
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/pose_data', Pose, self.callback_pose)
@@ -23,21 +23,24 @@ class ROSInvariantsCalculation:
 
         # Define parameters of the window of measurements
         self.window_nb_samples = 21 # number of samples in window
-        self.window_horizon_length = 5.0 # size of the window in time [sec]
+        self.window_horizon_length = 2.0 # size of the window in time [sec]
         
         # Initialization window
         self.window_progress_step = self.window_horizon_length/self.window_nb_samples # time step between samples in window [sec]
         self.window_measured_positions = np.zeros((self.window_nb_samples,3))
-        self.progress_trigger = 0
+        self.progress_trigger = rospy.get_time()
         
         # Initialize invariants calculation problem
-        self.invariant_calculator = invariants_calculation.FrenetSerret_calc(nb_samples=self.window_nb_samples,w_pos=1,w_regul_jerk=10-8,fatrop_solver=True)
+        self.invariant_calculator = invariants_calculation.FrenetSerret_calc(nb_samples=self.window_nb_samples,w_pos=1,w_regul_jerk=10-10,fatrop_solver=True)
            
     def build_time_window(self, new_position):
         # Check if enough progress has passed for the new measurement to be included in the window
         progress_time = rospy.get_time() # measure progress
-        if progress_time > self.progress_trigger:
+        #print(progress_time)
 
+        if progress_time > self.progress_trigger:
+            #print("New measurement")
+            
             # Update window (unless it is a duplicate value)
             if np.all(new_position != self.window_measured_positions[-1]):
                 self.window_measured_positions[:-1] = self.window_measured_positions[1:] # push all measurements one sample back
@@ -47,6 +50,7 @@ class ROSInvariantsCalculation:
             
             # Set new time trigger
             self.progress_trigger = self.progress_trigger + self.window_progress_step     
+            #print(self.progress_trigger)
 
             # Report the number of nonzero samples in the window
             number_window_samples = np.count_nonzero(self.window_measured_positions[:, 0])
