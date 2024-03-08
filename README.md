@@ -1,4 +1,4 @@
-This package shows how [invariants_py](https://github.com/trajectory-invariants/invariants_py) can be integrated in a ROS application. 
+This package shows how [invariants_py](https://github.com/trajectory-invariants/invariants_py) can be integrated in a ROS application.
 
 Currently there are two examples:
 
@@ -9,8 +9,8 @@ Currently there are two examples:
 
 Dependencies:
 
-- ROS Noetic on Ubuntu 20.04 is assumed to be installed. Other versions of ROS/Ubuntu should work as well. 
-- A catkin workspace is assumed to be created (e.g. at `~/catkin_ws`) and configured for Python 3 using catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3`.
+- ROS Noetic on Ubuntu 20.04 is assumed to be installed. Other versions of ROS and Ubuntu should normally work as well but haven't been tested. 
+- A catkin workspace is assumed to be created (e.g. at `~/catkin_ws`) and configured for Python 3 using `catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3`.
 - [invariants_py](https://github.com/trajectory-invariants/invariants_py) should be installed in your Python environment.
 
 Open a terminal and clone the [invariants_py_ros](https://gitlab.kuleuven.be/robotgenskill/ros-packages/invariants_py_ros) repository into your Catkin workspace:
@@ -29,7 +29,12 @@ rospack profile
 
 ### Online invariants calculation
 
-The invariants calculation node assumes that trajectory data is being streamed on a `geometry_msgs/Pose` topic.
+The _ros_invariants_calculation_ node calculates the vector invariants for a point trajectory.
+
+Overview of topics:
+- input **/pose_data** : measured pose, message type: _geometry_msgs/Pose_
+- output **/pose_data_stamped** : measured pose with timestamp for visualization, message type: _geometry_msgs/PoseStamped_
+- output **/trajectory_online** : estimated trajectory by the invariant optimization,  message type: _nav_msgs.msg/Path_
 
 The node can be launched using:
 
