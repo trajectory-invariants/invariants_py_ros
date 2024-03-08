@@ -32,9 +32,9 @@ rospack profile
 The _ros_invariants_calculation_ node calculates the vector invariants for a point trajectory.
 
 Overview of topics:
-- input **/pose_data** : measured pose, message type: _geometry_msgs/Pose_
-- output **/pose_data_stamped** : measured pose with timestamp for visualization, message type: _geometry_msgs/PoseStamped_
-- output **/trajectory_online** : estimated trajectory by the invariant optimization,  message type: _nav_msgs.msg/Path_
+- **/pose_data** (input): measured pose, message type: `geometry_msgs/Pose`
+- **/pose_data_stamped** (output): measured pose with time-stamp to enable visualization, message type: `geometry_msgs/PoseStamped`
+- **/trajectory_online** (output): estimated trajectory by the invariant optimization,  message type: `nav_msgs.msg/Path`
 
 The node can be launched using:
 
