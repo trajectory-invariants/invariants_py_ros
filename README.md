@@ -37,12 +37,15 @@ The node can be launched using:
 roslaunch invariants_py_ros launch_invars_calc.launch
 ```
 
-To test the calculation you can try using prerecorded data from the following bagfile:
+#### Example 
+
+To test the calculation, you can use
 
 ```shell
-roscd invariants_py_ros
-rosbag play -l -r 0.5 data/example_pose_data.bag
+roslaunch invariants_py_ros launch_invars_calc_test.launch
 ```
+
+which uses prerecorded data from a bagfile and includes visualization in rviz.
 
 Suggested improvements:
 
