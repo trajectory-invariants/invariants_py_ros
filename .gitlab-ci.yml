@@ -1,7 +1,7 @@
 image: ros:noetic
 
 before_script:
-  #- apt-get update && apt-get install -y python-rosdep python-rosinstall python-vcstool
+  - apt-get update && apt-get install -y git
   #- rosdep update
   - mkdir -p ~/catkin_ws/src
   - cd ~/catkin_ws
