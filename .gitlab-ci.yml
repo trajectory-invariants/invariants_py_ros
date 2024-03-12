@@ -3,11 +3,13 @@ image: ros:noetic
 before_script:
   - apt-get update && apt-get install -y git
   #- rosdep update
+  - source /opt/ros/noetic/setup.bash
   - mkdir -p ~/catkin_ws/src
   - cd ~/catkin_ws
   - cd src
   - git clone https://gitlab.kuleuven.be/robotgenskill/ros-packages/invariants_py_ros
   - cd ..
+  
   - catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
 
 test:
