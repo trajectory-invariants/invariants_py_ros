@@ -12,6 +12,7 @@ from nav_msgs.msg import Path
 import rospkg
 from invariants_py import read_and_write_data as rw
 from invariants_py import rockit_class_frenetserret_generation_position as OCP_gen
+import invariants_py.spline_handler as sh
 
 class ROSInvariantTrajectoryGeneration:
     def __init__(self, invariant_model_location):
@@ -24,7 +25,7 @@ class ROSInvariantTrajectoryGeneration:
 
         # Initialize invariant trajectory generation problem
         self.invariant_model = rw.read_invariants_from_csv(invariant_model_location)
-        self.target_position = [0,0,0]
+        self.target_position = [1.0,1.0,1.0]
 
     def callback_target_pose(self, pose_msg):
         # Callback function to process the received Pose message
@@ -32,9 +33,17 @@ class ROSInvariantTrajectoryGeneration:
         
     def run(self):
 
-        FS_online_generation_problem = OCP_gen.FrenetSerret_gen_pos(window_len=10, fatrop_solver=True, bounds_mf=False)
+        N = 40
 
+        FS_online_generation_problem = OCP_gen.FrenetSerret_gen_pos(window_len=N, fatrop_solver=True, bounds_mf=False)
 
+        # Resample model invariants to desired number of N samples
+        spline_invariant_model = sh.create_spline_model(self.invariant_model[:,0], self.invariant_model[:,1:])
+        progress_values = np.linspace(self.invariant_model[0,0],self.invariant_model[-1,0],N)
+        model_invariants,progress_step = sh.interpolate_invariants(spline_invariant_model, progress_values)
+        
+        #print(model_invariants)
+        
         # Function to be run in a loop at the specified update rate
         while not rospy.is_shutdown():
             
@@ -42,9 +51,9 @@ class ROSInvariantTrajectoryGeneration:
             boundary_constraints = {"position": {"initial": [0, 0, 0], "final": self.target_position}}
 
             # Generate trajectory
-            invariants, traj, mf = FS_online_generation_problem.generate_trajectory(self.invariant_model,boundary_constraints)
+            invariants, traj, mf = FS_online_generation_problem.generate_trajectory_online(model_invariants,boundary_constraints,step_size=progress_step)
 
-            print(traj)
+            print(invariants)
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 
