@@ -7,12 +7,12 @@ before_script:
   - cd ~/catkin_ws
   - catkin_init_workspace src
   - cd src
-  - git clone https://github.com/yourusername/yourrepository.git
+  - git clone https://gitlab.kuleuven.be/robotgenskill/ros-packages/invariants_py_ros
   - cd ..
-  - rosdep install --from-paths src --ignore-src -r -y
-  - catkin_make
+  - catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
 
 test:
   script:
     - source devel/setup.bash
-    - timeout --signal=SIGINT 1m roslaunch yourpackage yourlaunchfile.launch
+    - rospack profile
+    - timeout --signal=SIGINT 1m roslaunch invariants_py_ros launch_invars_calc_test.launch
