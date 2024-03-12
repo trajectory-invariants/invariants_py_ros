@@ -13,7 +13,7 @@ class SimulateTargetPose:
         self.pose = Pose()
 
     def simulate_motion(self):
-        rate = rospy.Rate(30)  # 30 Hz
+        rate = rospy.Rate(50)  # 30 Hz
         start_time = rospy.Time.now().to_sec()
         while not rospy.is_shutdown():
             current_time = rospy.Time.now().to_sec()
