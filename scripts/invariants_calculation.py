@@ -87,7 +87,7 @@ class ROSInvariantsCalculation:
                 # Visualize the trajectory in rviz
                 trajectory_msg = helper_functions_ros.convert_nparray_to_Path(traj)
                 self.publisher_traj_calc.publish(trajectory_msg)
-                #print(trajectory_msg)
+                print(traj)
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 
