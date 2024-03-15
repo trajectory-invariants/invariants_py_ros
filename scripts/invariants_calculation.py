@@ -6,6 +6,7 @@ import rospy
 import numpy as np
 from geometry_msgs.msg import Pose, PoseStamped
 import invariants_py.rockit_frenetserret_calculation_minimumjerk as invariants_calculation
+import invariants_py.rockit_class_frenetserret_calculation_reformulation_position as invariants_calculation
 import std_msgs.msg
 import helper_functions_ros
 from nav_msgs.msg import Path
@@ -22,7 +23,7 @@ class ROSInvariantsCalculation:
         self.publisher_traj_meas = rospy.Publisher('/pose_data_stamped', PoseStamped, queue_size=10)
 
         # Define parameters of the window of measurements
-        self.window_nb_samples = 21 # number of samples in window
+        self.window_nb_samples = 21 # number of samples in window for the given horizon length
         self.window_horizon_length = 2.0 # size of the window in time [sec]
         
         # Initialization window
@@ -31,7 +32,8 @@ class ROSInvariantsCalculation:
         self.progress_trigger = rospy.get_time()
         
         # Initialize invariants calculation problem
-        self.invariant_calculator = invariants_calculation.FrenetSerret_calc(nb_samples=self.window_nb_samples,w_pos=1,w_regul_jerk=10-10,fatrop_solver=True)
+        self.invariant_calculator = invariants_calculation.FrenetSerret_calc_pos(window_len=self.window_nb_samples,rms_error_traj= 10**-2,fatrop_solver=False)
+        #self.invariant_calculator = invariants_calculation.FrenetSerret_calc(nb_samples=self.window_nb_samples,w_pos=1,w_regul_jerk=10-10,fatrop_solver=True)
            
     def build_time_window(self, new_position):
         # Check if enough progress has passed for the new measurement to be included in the window
@@ -82,7 +84,9 @@ class ROSInvariantsCalculation:
                 invariants = 0
             else:          
                 # Call the function from your invariant calculator
-                invariants, traj, mf = self.invariant_calculator.calculate_invariants_online(self.window_measured_positions, self.window_progress_step)
+                invariants, traj, mf = self.invariant_calculator.calculate_invariants_global(self.window_measured_positions, self.window_progress_step)
+                
+                print(invariants)
                 
                 # Visualize the trajectory in rviz
                 trajectory_msg = helper_functions_ros.convert_nparray_to_Path(traj[:-1])
