@@ -9,7 +9,7 @@
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find invariants_py_ros)/config/rviz_config_settings.rviz" />
 
     <!-- Play rosbag file with the loop flag and at 50% speed as original-->
-    <node name="rosbag_play" pkg="rosbag" type="play" args="-l -r 0.5 $(find invariants_py_ros)/data/geforceerd_trial1_pose.bag" />
+    <node name="rosbag_play" pkg="rosbag" type="play" args="-l -r 0.001 $(find invariants_py_ros)/data/geforceerd_trial1_pose.bag" />
 
 </launch>
 

@@ -85,9 +85,10 @@ class ROSInvariantsCalculation:
                 invariants, traj, mf = self.invariant_calculator.calculate_invariants_online(self.window_measured_positions, self.window_progress_step)
                 
                 # Visualize the trajectory in rviz
-                trajectory_msg = helper_functions_ros.convert_nparray_to_Path(traj)
+                trajectory_msg = helper_functions_ros.convert_nparray_to_Path(traj[:-1])
                 self.publisher_traj_calc.publish(trajectory_msg)
                 print(invariants)
+                print(traj[:-1])
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 
