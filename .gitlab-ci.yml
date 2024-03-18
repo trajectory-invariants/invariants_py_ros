@@ -9,8 +9,7 @@ before_script:
   - cd src
   - git clone https://gitlab.kuleuven.be/robotgenskill/ros-packages/invariants_py_ros
   - cd ..
-  
-  - catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
+  - catkin build
 
 test:
   script:
