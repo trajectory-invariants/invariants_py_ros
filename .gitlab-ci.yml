@@ -3,7 +3,7 @@ image: osrf/ros:noetic-desktop-full
 before_script:
   - apt-get update && apt-get install -y git
   #- rosdep update
-  #- source /opt/ros/noetic/setup.bash
+  - source /opt/ros/noetic/setup.bash
   - mkdir -p ~/catkin_ws/src
   - cd ~/catkin_ws
   - cd src
