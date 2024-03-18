@@ -1,0 +1,19 @@
+<launch>
+    <!-- Launch the rospy node -->
+    <node name="simulate_target" pkg="invariants_py_ros" type="simulate_target_pose.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <!-- Launch the rospy node -->
+    <node name="generate_trajectory" pkg="invariants_py_ros" type="trajectory_generation.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <!-- Launch RViz with config file -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find invariants_py_ros)/config/rviz_config_trajgen.rviz" />
+
+
+</launch>
+

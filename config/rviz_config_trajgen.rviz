@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Marker1
         - /Marker2
       Splitter Ratio: 0.5
     Tree Height: 746
@@ -54,7 +55,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /trajectory_online
+      Marker Topic: /trajectory
       Name: Marker
       Namespaces:
         "": true
@@ -62,7 +63,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /pose_data_stamped
+      Marker Topic: /target_pose_marker
       Name: Marker
       Namespaces:
         "": true
@@ -96,7 +97,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.5355103015899658
+      Distance: 4.276907920837402
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -104,9 +105,9 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.19929231703281403
-        Y: -0.5878325700759888
-        Z: 0.4323427975177765
+        X: -0.3823383152484894
+        Y: 0.12413349747657776
+        Z: 0.7968916893005371
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -114,7 +115,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.1903984099626541
       Target Frame: <Fixed Frame>
-      Yaw: 0.5853981971740723
+      Yaw: 0.6103981733322144
     Saved: ~
 Window Geometry:
   Displays:

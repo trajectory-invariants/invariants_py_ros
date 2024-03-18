@@ -10,6 +10,9 @@ import invariants_py.rockit_calculate_vector_invariants_position as invariants_c
 import std_msgs.msg
 import helper_functions_ros
 from nav_msgs.msg import Path
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
+from tf.transformations import quaternion_from_matrix
 
 class ROSInvariantsCalculation:
     def __init__(self):
@@ -19,8 +22,9 @@ class ROSInvariantsCalculation:
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/pose_data', Pose, self.callback_pose)
         #self.result_publisher = rospy.Publisher('/invariant_result', Float64, queue_size=10)  
-        self.publisher_traj_calc = rospy.Publisher('/trajectory_online', Path, queue_size=10)
-        self.publisher_traj_meas = rospy.Publisher('/pose_data_stamped', PoseStamped, queue_size=10)
+        self.publisher_traj_calc = rospy.Publisher('/trajectory_online', Marker, queue_size=10)
+        self.publisher_traj_meas = rospy.Publisher('/pose_data_stamped', Marker, queue_size=10)
+        self.publisher_mf = rospy.Publisher('/moving_frame', PoseStamped, queue_size=10)
 
         # Define parameters of the window of measurements
         self.window_nb_samples = 21 # number of samples in window for the given horizon length
@@ -67,15 +71,48 @@ class ROSInvariantsCalculation:
         # Update window of measurements
         self.build_time_window(new_position)
 
-        # Publish Pose message again, but now with a time stamp and frame_id (necessary for visualization in rviz)
-        pose_stamped_msg = PoseStamped()
-        pose_stamped_msg.pose = pose_msg # copy pose message
-        pose_stamped_msg.header = std_msgs.msg.Header() # create a new Header message
-        pose_stamped_msg.header.stamp = rospy.Time.now() # add timestamp
-        pose_stamped_msg.header.frame_id = 'world' # add frame_id
-        self.publisher_traj_meas.publish(pose_stamped_msg)
+        # Create a Marker message for the sphere
+        marker = Marker()
+        marker.header = std_msgs.msg.Header()
+        marker.header.stamp = rospy.Time.now() # add timestamp
+        marker.header.frame_id = 'world' # add frame_id
+        marker.type = marker.SPHERE
+        marker.action = marker.ADD
+        # Set marker properties
+        marker.scale.x = 0.02
+        marker.scale.y = 0.02
+        marker.scale.z = 0.02
+        marker.color.a = 1.0
+        marker.color.r = 0.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        # Set marker position
+        marker.pose.position.x = pose_msg.position.x
+        marker.pose.position.y = pose_msg.position.y
+        marker.pose.position.z = pose_msg.position.z
+        # Publish the Marker
+        self.publisher_traj_meas.publish(marker)
+
+
 
     def run(self):
+
+        # Create the Marker message
+        marker = Marker()
+        marker.header = std_msgs.msg.Header()
+        marker.header.frame_id = "world"
+        marker.type = marker.LINE_STRIP
+        marker.action = marker.ADD
+
+        # Set marker properties
+        marker.scale.x = 0.0025
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+
+        # Create a PoseStamped message
+        pose_stamped = PoseStamped()
+        pose_stamped.header.frame_id = "world"
+
         # Function to be run in a loop at the specified update rate
         while not rospy.is_shutdown():
             
@@ -86,13 +123,37 @@ class ROSInvariantsCalculation:
                 # Call the function from your invariant calculator
                 invariants, traj, mf = self.invariant_calculator.calculate_invariants_online(self.window_measured_positions, self.window_progress_step)
                 
-                print(invariants)
+                # Add points to the marker
+                marker.points = []
+                for point in traj[:-2]:  # Assuming traj is a numpy array of shape (N, 3)
+                    p = Point()
+                    p.x = point[0]
+                    p.y = point[1]
+                    p.z = point[2]
+                    marker.points.append(p)
+
+                # Publish the Marker
+                marker.header.stamp = rospy.Time.now() # add timestamp
+                self.publisher_traj_calc.publish(marker)
+
+                # Extend the 3x3 rotation matrix to a 4x4 transformation matrix
+                transformation_matrix = np.eye(4)
+                transformation_matrix[:3, :3] = mf[-2,:,:]
+
+                # Set the header
+                pose_stamped.header.stamp = rospy.Time.now()
+                # Set the position
+                pose_stamped.pose.position.x = traj[-2, 0]
+                pose_stamped.pose.position.y = traj[-2, 1]
+                pose_stamped.pose.position.z = traj[-2, 2]
+                quaternion = quaternion_from_matrix(transformation_matrix)
+                pose_stamped.pose.orientation.x = quaternion[0]
+                pose_stamped.pose.orientation.y = quaternion[1]
+                pose_stamped.pose.orientation.z = quaternion[2]
+                pose_stamped.pose.orientation.w = quaternion[3]
+
+                self.publisher_mf.publish(pose_stamped)
                 
-                # Visualize the trajectory in rviz
-                trajectory_msg = helper_functions_ros.convert_nparray_to_Path(traj[:-1])
-                self.publisher_traj_calc.publish(trajectory_msg)
-                print(invariants)
-                print(traj[:-1])
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 
