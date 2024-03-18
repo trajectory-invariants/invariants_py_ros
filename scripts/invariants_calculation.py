@@ -123,6 +123,8 @@ class ROSInvariantsCalculation:
                 # Call the function from your invariant calculator
                 invariants, traj, mf = self.invariant_calculator.calculate_invariants_online(self.window_measured_positions, self.window_progress_step)
                 
+                print(invariants)
+                
                 # Add points to the marker
                 marker.points = []
                 for point in traj[:-2]:  # Assuming traj is a numpy array of shape (N, 3)
