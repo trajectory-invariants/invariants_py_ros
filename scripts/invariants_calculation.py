@@ -21,7 +21,7 @@ class ROSInvariantsCalculation:
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/pose_data', Pose, self.callback_pose)
-        #self.result_publisher = rospy.Publisher('/invariant_result', Float64, queue_size=10)  
+        self.publisher_invariants = rospy.Publisher('/invariants_result', std_msgs.msg.Float32MultiArray, queue_size=10)  
         self.publisher_traj_calc = rospy.Publisher('/trajectory_online', Marker, queue_size=10)
         self.publisher_traj_meas = rospy.Publisher('/pose_data_stamped', Marker, queue_size=10)
         self.publisher_mf = rospy.Publisher('/moving_frame', PoseStamped, queue_size=10)
@@ -123,8 +123,10 @@ class ROSInvariantsCalculation:
                 # Call the function from your invariant calculator
                 invariants, traj, mf = self.invariant_calculator.calculate_invariants_online(self.window_measured_positions, self.window_progress_step)
                 
-                print(invariants)
-                
+                # print(invariants)
+                invariants_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(invariants)
+                self.publisher_invariants.publish(invariants_float32_array)
+
                 # Add points to the marker
                 marker.points = []
                 for point in traj[:-2]:  # Assuming traj is a numpy array of shape (N, 3)

@@ -5,6 +5,11 @@
         <param name="your_parameter_name" type="int" value="1" />
     </node>
 
+    <node name="invariants_plotting" pkg="invariants_py_ros" type="invariants_plotting.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
     <!-- Launch RViz with config file -->
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find invariants_py_ros)/config/rviz_config_settings.rviz" />
 
