@@ -16,6 +16,7 @@ class ROSInvariantsPlotting:
         self.publisher_inv_2 = rospy.Publisher('/second_invariant', Float32MultiArray, queue_size=10)
         self.publisher_inv_3 = rospy.Publisher('/third_invariant', Float32MultiArray, queue_size=10)
 
+        # Initialize data structures
         self.invariants = None
         self.inv_1 = Float32MultiArray()
         self.inv_2 = Float32MultiArray()
@@ -23,14 +24,19 @@ class ROSInvariantsPlotting:
 
     def callback_invariants(self, data):
         self.invariants = np.reshape(data.data, (-1, 3))
-        self.inv_1.data = data.data[0::3]
-        self.inv_2.data = data.data[1::3]
-        self.inv_3.data = data.data[2::3]
+
+        # Split data into correct invariants
+        self.inv_1.data = data.data[0::3] # Every third value, starting from the first
+        self.inv_2.data = data.data[1::3] # Every third value, starting from the second
+        self.inv_3.data = data.data[2::3] # Every third value, starting from the third
 
     def run(self):
         while not rospy.is_shutdown():
+
+            # Check if data is received yet
             if self.invariants is not None:
-                # print(self.inv1)
+
+                # Publish data to be plotted with rqt_plot
                 self.publisher_inv_1.publish(self.inv_1)
                 self.publisher_inv_2.publish(self.inv_2)
                 self.publisher_inv_3.publish(self.inv_3)
