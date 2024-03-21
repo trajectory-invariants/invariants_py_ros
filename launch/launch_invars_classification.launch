@@ -1,0 +1,21 @@
+<launch>
+    <!-- Launch the rospy node -->
+    <node name="invariants_calculation" pkg="invariants_py_ros" type="invariants_calculation.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <node name="invariants_plotting" pkg="invariants_py_ros" type="invariants_plotting.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+        <node name="invariants_classification" pkg="invariants_py_ros" type="invariants_classification.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <!-- Play rosbag file with the loop flag and at 50% speed as original-->
+    <node name="rosbag_play" pkg="rosbag" type="play" args="-l -r 0.75 $(find invariants_py_ros)/data/forced_gestures_pose.bag" />
+
+</launch>

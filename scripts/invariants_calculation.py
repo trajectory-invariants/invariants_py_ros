@@ -17,7 +17,7 @@ from tf.transformations import quaternion_from_matrix
 class ROSInvariantsCalculation:
     def __init__(self):
         rospy.init_node('ros_invariants_calculation', anonymous=True)
-        self.update_rate = rospy.Rate(30)  # Set the ROS node update rate (Default: 20 Hz)
+        self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/pose_data', Pose, self.callback_pose)
