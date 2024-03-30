@@ -8,7 +8,7 @@ from std_msgs.msg import Float32MultiArray
 class ROSInvariantsPlotting:
     def __init__(self):
         rospy.init_node('ros_invariants_plotting', anonymous=True)
-        self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
+        self.update_rate = rospy.Rate(30)  # Set the ROS node update rate (Default: 20 Hz)
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/invariants_result', Float32MultiArray, self.callback_invariants)
@@ -40,6 +40,7 @@ class ROSInvariantsPlotting:
                 self.publisher_inv_1.publish(self.inv_1)
                 self.publisher_inv_2.publish(self.inv_2)
                 self.publisher_inv_3.publish(self.inv_3)
+
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 
 
