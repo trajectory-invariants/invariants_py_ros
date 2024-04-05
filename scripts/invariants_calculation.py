@@ -37,7 +37,7 @@ class ROSInvariantsCalculation:
         self.progress_trigger = rospy.get_time()
         
         # Initialize invariants calculation problem
-        self.invariant_calculator = invariants_calculation.OCP_calc_pos(window_len=self.window_nb_samples,rms_error_traj= 10**-2,fatrop_solver=True)
+        self.invariant_calculator = invariants_calculation.OCP_calc_pos(window_len=self.window_nb_samples,rms_error_traj= 2*10**-2,fatrop_solver=True)
         #self.invariant_calculator = invariants_calculation.FrenetSerret_calc(nb_samples=self.window_nb_samples,w_pos=1,w_regul_jerk=10-10,fatrop_solver=True)
            
     def build_time_window(self, new_position):
@@ -120,7 +120,8 @@ class ROSInvariantsCalculation:
             # Check if window of measurements is not yet full
             if self.window_measured_positions[0,0] == 0:
                 invariants = 0
-            else:          
+            else:  
+                        
                 # Call the function from your invariant calculator
                 invariants, traj, mf = self.invariant_calculator.calculate_invariants_online(self.window_measured_positions, self.window_progress_step)
                 

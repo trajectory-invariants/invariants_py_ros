@@ -46,6 +46,7 @@ class ROSInvariantsClassification:
         self.starting_time = rospy.get_time()
 
 
+
     def callback_first_invariant(self, data):
         self.inv_1.data = data.data
 
@@ -96,13 +97,7 @@ class ROSInvariantsClassification:
 
         # Segment is only recognized if the DTW distance is below the threshold and the distance is increasing
         if (self.previous_distance_to_segment < distance_threshold) and (self.distance_to_segment > self.previous_distance_to_segment):
-            self.segment_found = True
-
-            print('SEGMENT FOUND')
-
-            # Print time passed until a segment is found    
-            print('Elapsed time:', rospy.get_time() - self.starting_time)
-        
+            self.segment_found = True        
         else:
             self.segment_found = False
 
@@ -127,16 +122,18 @@ class ROSInvariantsClassification:
     def angle_to_vertical_axis(self, traj_x, traj_y, traj_z):
         # Calculate the angle between the trajectory and the vertical vector
         
+        # Vertical vector
+        # vertical_vector = np.array([0.1, 0.4, 0.7])
+        vertical_vector = np.array([0, 1, 0])
+
         # Distance traveled in each direction
         x_dist = traj_x[-1] - traj_x[0]
         y_dist = traj_y[-1] - traj_y[0]
         z_dist = traj_z[-1] - traj_z[0]
-
-        # Distance in the xz plane
-        xz_dist = np.sqrt(x_dist**2 + z_dist**2)
+        traj_vector = np.array([x_dist, y_dist, z_dist])
 
         # Angle between the trajectory and the vertical vector
-        self.angle_to_vertical = np.arctan2(xz_dist, y_dist) * 180 / np.pi
+        self.angle_to_vertical = np.arccos(np.dot(vertical_vector, traj_vector) / (np.linalg.norm(vertical_vector) * np.linalg.norm(traj_vector))) * 180 / np.pi
     
 
     def run(self):
@@ -145,21 +142,21 @@ class ROSInvariantsClassification:
         references[0] = [-0.013336, 0.123938, 0.412655, 0.896227, 1.484626, 2.107109, 2.689924, 3.118931, 3.179457, 2.759977, 2.030783, 1.145614, 0.576452, 0.367894, 0.246758]
         references[1] = [-1.053221, -0.922412, -0.391974, 0.729533, 2.538487, 4.851655, 7.073614, 8.322857, 7.943930, 6.293696, 4.106775, 2.219112, 0.952984, 0.213465, -0.106656]
         references[2] = [-0.704372, -0.737801, -0.749550, -0.718569, -0.601639, -0.314620, 0.265431, 1.226275, 2.349643, 2.815916, 2.225132, 1.232017, 0.754472, 0.686508, 0.618684]
-        distance_threshold = 15
+        distance_threshold = 12
 
         while not rospy.is_shutdown():
-
+            
             # Check if data is received yet
             if len(self.inv_1.data) != 0:
                 
                 # Update segmentation DTW distance
-                self.dtw_segmentation(self.inv_1.data[6:], references, distance_threshold)
+                self.dtw_segmentation(self.inv_1.data, references, distance_threshold)
             
             # Check if data is received yet
             if len(self.traj_x.data) != 0:
                 
                 # Update angle to vertical vector
-                self.angle_to_vertical_axis(self.traj_x.data[6:], self.traj_y.data[6:], self.traj_z.data[6:])
+                self.angle_to_vertical_axis(self.traj_x.data, self.traj_y.data, self.traj_z.data)
 
             # Check if data is received yet
             if len(self.inv_2.data) != 0:
@@ -168,11 +165,24 @@ class ROSInvariantsClassification:
                 self.dtw_classification(self.inv_2.data, references)
 
             if self.segment_found:
+                print('SEGMENT FOUND')
+
+                # Print time passed until a segment is found    
+                print('Elapsed time:', rospy.get_time() - self.starting_time)
+                
                 print('Detected gesture:', self.current_gesture)
                 # print('DTW distance to START:', self.distance_to_gesture_1)
                 # print('DTW distance to STOP:', self.distance_to_gesture_2)
-                print('Angle to vertical axis', self.angle_to_vertical)
+                if 60 < self.angle_to_vertical < 120:
+                    print('Trajectory is horizontal')
+                elif 0 < self.angle_to_vertical < 60:
+                    print('Trajectory is upwards')
+                elif 120 < self.angle_to_vertical < 180:
+                    print('Trajectory is downwards')
+                # print(self.angle_to_vertical)
 
+                print ('')
+            
             # Publish the current DTW distance
             self.publisher_dtw_distance.publish(self.distance_to_segment)
 
