@@ -5,7 +5,7 @@
 import rospy
 import numpy as np
 from geometry_msgs.msg import Pose, PoseStamped
-import invariants_py.rockit_frenetserret_calculation_minimumjerk as invariants_calculation
+import invariants_py.rockit_calculate_vector_invariants_position_mj as invariants_calculation
 import std_msgs.msg
 import helper_functions_ros
 from nav_msgs.msg import Path
@@ -35,7 +35,7 @@ class ROSInvariantsCalculation:
         self.progress_trigger = rospy.get_time()
         
         # Initialize invariants calculation problem
-        self.invariant_calculator = invariants_calculation.FrenetSerret_calc(nb_samples=self.window_nb_samples,w_pos=10,w_regul_jerk=10-5,fatrop_solver=True)
+        self.invariant_calculator = invariants_calculation.OCP_calc_pos(nb_samples=self.window_nb_samples,w_pos=10,w_regul_jerk=10-5,fatrop_solver=True)
            
     def build_time_window(self, new_position):
         # Check if enough progress has passed for the new measurement to be included in the window
