@@ -5,7 +5,7 @@ import rospy
 import numpy as np
 from std_msgs.msg import Float32MultiArray, Float32
 from visualization_msgs.msg import Marker
-import dtw as dtw
+import dtw as dtw # TODO add installation instructions where to get this library
 
 class ROSInvariantsClassification:
     def __init__(self):
