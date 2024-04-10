@@ -146,7 +146,7 @@ class ROSInvariantsCalculation:
                 invariants_rot, traj_rot, mf_rot = self.invariant_rotation_calculator.calculate_invariants(self.window_measured_rotations, self.window_progress_step)
 
                 # print(traj)
-                # print(invariants)
+                # print(invariants_pos)
 
                 invariants_pos_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(invariants_pos)
                 invariants_rot_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(invariants_rot)
