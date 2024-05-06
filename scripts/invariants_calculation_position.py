@@ -5,11 +5,7 @@
 import rospy
 import numpy as np
 from geometry_msgs.msg import Pose, PoseStamped
-from math import pi
-from scipy.spatial.transform import Rotation as R
-#import invariants_py.rockit_calculate_vector_invariants_position_mj as invariants_calculation
 import invariants_py.rockit_calculate_vector_invariants_position as invariants_position_calculation
-import invariants_py.rockit_calculate_vector_invariants_rotation as invariants_rotation_calculation
 import std_msgs.msg
 import helper_functions_ros
 from nav_msgs.msg import Path
@@ -17,16 +13,18 @@ from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
 from tf.transformations import quaternion_from_matrix
 
-class ROSInvariantsCalculation:
+class ROSInvariantsCalculationPosition:
     def __init__(self):
 
-        rospy.init_node('ros_invariants_calculation', anonymous=True)
+        rospy.init_node('ros_invariants_calculation_position', anonymous=True)
         self.update_rate = rospy.Rate(30)  # Set the ROS node update rate (Default: 20 Hz)
                 
+        # Initialize the start time
+        self.starttime = rospy.get_time()
+
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/pose_data', Pose, self.callback_pose)
-        self.publisher_invariants_position = rospy.Publisher('/invariants_position_result', std_msgs.msg.Float32MultiArray, queue_size=10)
-        self.publisher_invariants_rotation = rospy.Publisher('/invariants_rotation_result', std_msgs.msg.Float32MultiArray, queue_size=10)   
+        self.publisher_invariants_position = rospy.Publisher('/invariants_position_result', std_msgs.msg.Float32MultiArray, queue_size=10)   
         self.publisher_traj_calc_array = rospy.Publisher('/trajectory_online_array', std_msgs.msg.Float32MultiArray, queue_size=10)
         self.publisher_traj_calc = rospy.Publisher('/trajectory_online', Marker, queue_size=10)
         self.publisher_traj_meas = rospy.Publisher('/pose_data_stamped', Marker, queue_size=10)
@@ -39,15 +37,13 @@ class ROSInvariantsCalculation:
         # Initialization window
         self.window_progress_step = self.window_horizon_length/self.window_nb_samples # time step between samples in window [sec]
         self.window_measured_positions = np.zeros((self.window_nb_samples,3))
-        self.window_measured_rotations = np.zeros((self.window_nb_samples,3,3))
         self.progress_trigger = rospy.get_time()
         
         # Initialize invariants calculation problem
         self.invariant_position_calculator = invariants_position_calculation.OCP_calc_pos(window_len=self.window_nb_samples,rms_error_traj= 2*10**-2,fatrop_solver=True)
-        self.invariant_rotation_calculator = invariants_rotation_calculation.OCP_calc_rot(window_len=self.window_nb_samples,rms_error_traj= 4*pi/180,fatrop_solver=True)
-        #self.invariant_calculator = invariants_calculation.FrenetSerret_calc(nb_samples=self.window_nb_samples,w_pos=1,w_regul_jerk=10-10,fatrop_solver=True)
+
            
-    def build_time_window(self, new_position, new_rotation):
+    def build_time_window(self, new_position):
         # Check if enough progress has passed for the new measurement to be included in the window
         progress_time = rospy.get_time() # measure progress
         #print(progress_time)
@@ -60,9 +56,6 @@ class ROSInvariantsCalculation:
 
                 self.window_measured_positions[:-1] = self.window_measured_positions[1:] # push all measurements one sample back
                 self.window_measured_positions[-1] = new_position # add new measurement as last sample
-            
-                self.window_measured_rotations[:-1] = self.window_measured_rotations[1:] # push all measurements one sample back
-                self.window_measured_rotations[-1] = new_rotation # add new measurement as last sample
 
             else:
                 print("Skipping new measurement because it is a duplicate")            
@@ -80,11 +73,9 @@ class ROSInvariantsCalculation:
     def callback_pose(self, pose_msg):
         # Callback function to process the received Pose message
         new_position = np.array([pose_msg.position.x, pose_msg.position.y, pose_msg.position.z])
-        new_quaternion = np.array([pose_msg.orientation.x, pose_msg.orientation.y, pose_msg.orientation.z, pose_msg.orientation.w])
-        new_rotation = R.from_quat(new_quaternion).as_matrix()
         
         # Update window of measurements
-        self.build_time_window(new_position, new_rotation)
+        self.build_time_window(new_position)
 
         # Create a Marker message for the sphere
         marker = Marker()
@@ -134,26 +125,21 @@ class ROSInvariantsCalculation:
             # Check if window of measurements is not yet full
             if self.window_measured_positions[0,0] == 0:
                 invariants_pos = 0
-                invariants_rot = 0
             else:  
-                # if invariants_pos == 0 and invariants_rot == 0:
-                #     print('TIME UNTIL FIRST INVARIANT CALCULATION: ', rospy.get_time()-self.starttime)
+                
+                # print('TIME UNTIL FIRST POSITION CALCULATION: ', rospy.get_time()-self.starttime)
 
                 # Call the function from your invariant calculator
                 # print(self.window_measured_positions)
-                # print(self.window_measured_rotations)
                 invariants_pos, traj, mf = self.invariant_position_calculator.calculate_invariants(self.window_measured_positions, self.window_progress_step)
-                invariants_rot, traj_rot, mf_rot = self.invariant_rotation_calculator.calculate_invariants(self.window_measured_rotations, self.window_progress_step)
 
                 # print(traj)
                 # print(invariants_pos)
 
                 invariants_pos_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(invariants_pos)
-                invariants_rot_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(invariants_rot)
                 traj_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(traj)
 
                 self.publisher_invariants_position.publish(invariants_pos_float32_array)
-                self.publisher_invariants_rotation.publish(invariants_rot_float32_array)
                 self.publisher_traj_calc_array.publish(traj_float32_array)
 
                 # Add points to the marker
@@ -193,9 +179,9 @@ class ROSInvariantsCalculation:
 if __name__ == '__main__':
     try:
         # Create and initialize ROS node
-        ros_invariants_node = ROSInvariantsCalculation()
+        ros_invariants_position_node = ROSInvariantsCalculationPosition()
         
         # Run the loop of the node
-        ros_invariants_node.run()
+        ros_invariants_position_node.run()
     except rospy.ROSInterruptException:
         pass

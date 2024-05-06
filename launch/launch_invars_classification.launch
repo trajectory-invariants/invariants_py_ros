@@ -1,19 +1,24 @@
 <launch>
     <!-- Launch the rospy node -->
-    <node name="invariants_calculation" pkg="invariants_py_ros" type="invariants_calculation.py" output="screen">
+    <node name="invariants_calculation_position" pkg="invariants_py_ros" type="invariants_calculation_position.py" output="screen">
         <!-- Optional rosparam parameter with default value of 1 -->
         <param name="your_parameter_name" type="int" value="1" />
     </node>
 
-    <node name="invariants_plotting" pkg="invariants_py_ros" type="invariants_plotting.py" output="screen">
+    <node name="invariants_segmentation" pkg="invariants_py_ros" type="invariants_segmentation.py" output="screen">
         <!-- Optional rosparam parameter with default value of 1 -->
         <param name="your_parameter_name" type="int" value="1" />
     </node>
 
-        <node name="invariants_classification" pkg="invariants_py_ros" type="invariants_classification.py" output="screen">
+    <node name="invariants_classification" pkg="invariants_py_ros" type="invariants_classification.py" output="screen">
         <!-- Optional rosparam parameter with default value of 1 -->
         <param name="your_parameter_name" type="int" value="1" />
     </node>
+
+    <node name="robot_simulation" pkg="invariants_py_ros" type="robot_simulation.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>    
 
     <!-- Play rosbag file with the loop flag and at 50% speed as original-->
     <node name="rosbag_play" pkg="rosbag" type="play" args="-r 0.99 $(find invariants_py_ros)/data/forced_gestures_pose.bag" />
