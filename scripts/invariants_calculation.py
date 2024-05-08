@@ -26,7 +26,7 @@ class ROSInvariantsCalculation:
         self.publisher_mf = rospy.Publisher('/moving_frame', PoseStamped, queue_size=10)
 
         # Define parameters of the window of measurements
-        self.window_nb_samples = 10 # number of samples in window
+        self.window_nb_samples = 50 # number of samples in window
         self.window_horizon_length = 1.0 # size of the window in time [sec]
         
         # Initialization window
@@ -35,7 +35,7 @@ class ROSInvariantsCalculation:
         self.progress_trigger = rospy.get_time()
         
         # Initialize invariants calculation problem
-        self.invariant_calculator = invariants_calculation.OCP_calc_pos(nb_samples=self.window_nb_samples,w_pos=10,w_regul_jerk=10-5,fatrop_solver=True)
+        self.invariant_calculator = invariants_calculation.OCP_calc_pos(nb_samples=self.window_nb_samples,w_pos=10**0,w_regul_jerk=10**(-4),fatrop_solver=True)
            
     def build_time_window(self, new_position):
         # Check if enough progress has passed for the new measurement to be included in the window
@@ -76,14 +76,16 @@ class ROSInvariantsCalculation:
         marker.header.frame_id = 'world' # add frame_id
         marker.type = marker.SPHERE
         marker.action = marker.ADD
-        # Set marker properties
-        marker.scale.x = 0.02
-        marker.scale.y = 0.02
-        marker.scale.z = 0.02
-        marker.color.a = 1.0
-        marker.color.r = 0.0
-        marker.color.g = 0.0
-        marker.color.b = 1.0
+
+        # Set the properties of the spherical marker visualizing the current pose
+        marker.scale.x = 0.02 # --> specifies the size of the marker
+        marker.scale.y = 0.02 # --> specifies the size of the marker
+        marker.scale.z = 0.02 # --> specifies the size of the markers
+        marker.color.a = 1.0  # --> specifies the transparancy 
+        marker.color.r = 0.0  # --> specifies the color 
+        marker.color.g = 1.0  # --> specifies the color 
+        marker.color.b = 0.0  # --> specifies the color 
+
         # Set marker position
         marker.pose.position.x = pose_msg.position.x
         marker.pose.position.y = pose_msg.position.y
@@ -102,10 +104,10 @@ class ROSInvariantsCalculation:
         marker.type = marker.LINE_STRIP
         marker.action = marker.ADD
 
-        # Set marker properties
-        marker.scale.x = 0.0025
-        marker.color.a = 1.0
-        marker.color.r = 1.0
+        # Set the properties of the (line)markers for the reconstructed trajectory
+        marker.scale.x = 0.0025 # --> specifies the size of the markers
+        marker.color.a = 1.0    # --> specifies the transparancy 
+        marker.color.r = 1.0    # --> specifies the color 
 
         # Create a PoseStamped message
         pose_stamped = PoseStamped()
