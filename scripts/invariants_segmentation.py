@@ -70,32 +70,6 @@ class ROSInvariantsSegmentation:
 
         # print(self.pos_1.data)
 
-    # def callback_invariants_rotation(self, data):
-
-    #     # Split data into correct invariants
-    #     self.rot_1.data = data.data[0::3] # Every third value, starting from the first
-    #     self.rot_2.data = data.data[1::3] # Every third value, starting from the second
-    #     self.rot_3.data = data.data[2::3] # Every third value, starting from the third
-
-    #     # Invert the sign of the data if the biggest value is negative
-    #     if max(self.rot_1.data) < (-1)*min(self.rot_1.data):
-    #         self.rot_1.data = (-1)*self.rot_1.data
-
-    #     if max(self.rot_2.data) < (-1)*min(self.rot_2.data):
-    #         self.rot_2.data = (-1)*self.rot_2.data
-
-    #     if max(self.rot_3.data) < (-1)*min(self.rot_3.data):
-    #         self.rot_3.data = (-1)*self.rot_3.data
-
-
-    # def callback_trajectory(self, data):
-
-    #     # Split trajectory data into correct coordinates
-    #     self.traj_x.data = data.data[0::3] # Every third value, starting from the first
-    #     self.traj_y.data = data.data[1::3] # Every third value, starting from the second
-    #     self.traj_z.data = data.data[2::3] # Every third value, starting from the third
-
-
 
     def dtw_distance(self, a, b, band_size):
         # Calculates final value in DTW matrix between signals a and b, while staying inside the specified band
@@ -119,40 +93,6 @@ class ROSInvariantsSegmentation:
         else:
             self.segment_found.data = False
 
-
-    # def dtw_classification(self, rot_1, references):
-    #     # Determine size of reference window and set the band size to be more than half of the window for first invariant
-    #     # For second invariant, data might be lagging behind, so we choose a bigger band size
-    #     window_size = len(references[0])
-    #     band_size_w1 = int(window_size/2 - 1) + 3
-    
-    #     # Calculate DTW distance to all references
-    #     self.distance_to_gesture_1 = self.dtw_distance(rot_1, references[1], band_size_w1)
-    #     self.distance_to_gesture_2 = self.dtw_distance(rot_1, references[2], band_size_w1)
-
-    #     # Classification based on Nearest Neighbors approach
-    #     if self.distance_to_gesture_1 - 10 < self.distance_to_gesture_2:
-    #         self.current_gesture = 'START'
-    #     else:
-    #         self.current_gesture = 'STOP'
-
-    
-    # def angle_to_vertical_axis(self, traj_x, traj_y, traj_z):
-    #     # Calculate the angle between the trajectory and the vertical vector
-        
-    #     # Specify the orientation of the vertical vector
-    #     # vertical_vector = np.array([0.1, 0.4, 0.7])
-    #     vertical_vector = np.array([0, 1, 0])
-
-    #     # Distance traveled in each direction
-    #     x_dist = traj_x[-1] - traj_x[0]
-    #     y_dist = traj_y[-1] - traj_y[0]
-    #     z_dist = traj_z[-1] - traj_z[0]
-    #     traj_vector = np.array([x_dist, y_dist, z_dist])
-
-    #     # Angle between the trajectory and the vertical vector
-    #     self.angle_to_vertical = np.arccos(np.dot(vertical_vector, traj_vector) / (np.linalg.norm(vertical_vector) * np.linalg.norm(traj_vector))) * 180 / np.pi
-    
 
     def run(self):
         # Arbitrary values, could be defined more vigorously

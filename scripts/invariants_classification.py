@@ -14,7 +14,7 @@ class ROSInvariantsClassification:
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/invariants_position_result', Float32MultiArray, self.callback_invariants_position)
-        # rospy.Subscriber('/invariants_rotation_result', Float32MultiArray, self.callback_invariants_rotation)
+        rospy.Subscriber('/invariants_rotation_result', Float32MultiArray, self.callback_invariants_rotation)
         rospy.Subscriber('/segment_found', Bool, self.callback_segment_found)
         rospy.Subscriber('/trajectory_online_array', Float32MultiArray, self.callback_trajectory)
 
@@ -25,7 +25,7 @@ class ROSInvariantsClassification:
         # self.pos_1 = Float32MultiArray()
         self.pos_2 = Float32MultiArray()
         # self.pos_3 = Float32MultiArray()
-        # self.rot_1 = Float32MultiArray()
+        self.rot_1 = Float32MultiArray()
         # self.rot_2 = Float32MultiArray()
         # self.rot_3 = Float32MultiArray()    
 
@@ -69,6 +69,23 @@ class ROSInvariantsClassification:
         # if max(self.pos_3.data) < (-1)*min(self.pos_3.data):
         #     self.pos_3.data = (-1)*self.pos_3.data
 
+    def callback_invariants_rotation(self, data):
+
+        # Split data into correct invariants
+        self.rot_1.data = data.data[0::3] # Every third value, starting from the first
+        # self.rot_2.data = data.data[1::3] # Every third value, starting from the second
+        # self.rot_3.data = data.data[2::3] # Every third value, starting from the third
+
+        # Invert the sign of the data if the biggest value is negative
+        if max(self.rot_1.data) < (-1)*min(self.rot_1.data):
+            self.rot_1.data = (-1)*self.rot_1.data
+
+        # if max(self.rot_2.data) < (-1)*min(self.rot_2.data):
+        #     self.rot_2.data = (-1)*self.rot_2.data
+
+        # if max(self.rot_3.data) < (-1)*min(self.rot_3.data):
+        #     self.rot_3.data = (-1)*self.rot_3.data
+
 
     def callback_segment_found(self, data):
         self.segment_found = data.data
@@ -92,8 +109,8 @@ class ROSInvariantsClassification:
         band_size_w1 = int(window_size/2 - 1) + 3
     
         # Calculate DTW distance to all references
-        self.distance_to_gesture_1 = self.dtw_distance(rot_1, references[1], band_size_w1)
-        self.distance_to_gesture_2 = self.dtw_distance(rot_1, references[2], band_size_w1)
+        self.distance_to_gesture_1 = self.dtw_distance(rot_1, references[3], band_size_w1)
+        self.distance_to_gesture_2 = self.dtw_distance(rot_1, references[4], band_size_w1)
 
         # Classification based on Nearest Neighbors approach
         if self.distance_to_gesture_1 - 10 < self.distance_to_gesture_2:
@@ -139,11 +156,12 @@ class ROSInvariantsClassification:
                 self.angle_to_vertical_axis(self.traj_x.data, self.traj_y.data, self.traj_z.data)
 
             # Check if data is received yet
-            if len(self.pos_2.data) != 0:
+            if len(self.rot_1.data) != 0:
                 
                 # print('ROTATION DATA RECEIVED', self.pos_2.data)
                 # Update classification DTW distance
-                self.dtw_classification(self.pos_2.data, references)
+                # print(max(self.rot_1.data))
+                self.dtw_classification(self.rot_1.data, references)
 
             if self.segment_found:
                 print('SEGMENT FOUND')

@@ -5,6 +5,11 @@
         <param name="your_parameter_name" type="int" value="1" />
     </node>
 
+    <node name="invariants_calculation_rotation" pkg="invariants_py_ros" type="invariants_calculation_rotation.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
     <node name="invariants_segmentation" pkg="invariants_py_ros" type="invariants_segmentation.py" output="screen">
         <!-- Optional rosparam parameter with default value of 1 -->
         <param name="your_parameter_name" type="int" value="1" />
