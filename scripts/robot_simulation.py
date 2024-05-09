@@ -24,7 +24,6 @@ class ROSRobotSimulation:
         # Initialize the robot simulation
         self.radius = 1
         self.contour = 1
-        self.speed = 1
         self.status = 1
         self.t = 0
     
@@ -34,7 +33,7 @@ class ROSRobotSimulation:
         self.gesture.data = data.data
 
         if self.gesture.data == 1:
-            self.contour = 2
+            self.contour = 1
 
         elif self.gesture.data == 2:
             self.status = 1
@@ -43,19 +42,19 @@ class ROSRobotSimulation:
             self.status = 0
 
         elif self.gesture.data == 4:
-            self.contour = 1
+            self.contour = 2
 
         elif self.gesture.data == 5:
             self.radius = 2
             
         elif self.gesture.data == 6:
-            self.radius = 0.5
+            self.radius = 1
 
     
     def run(self):
         
-        px = [0]
-        py = [1]
+        px = [1]
+        py = [0]
         
 
         while not rospy.is_shutdown():
@@ -65,11 +64,11 @@ class ROSRobotSimulation:
             # if len(self.gesture.data) != 0:
             # print(self.gesture.data)
 
-            self.t += 2*np.pi/90
 
             if self.status == 1:
-                px.append(self.radius * np.sin(self.contour * self.t))
-                py.append(self.radius * np.cos(self.t))
+                self.t += 2*np.pi/90
+                px.append(self.contour * self.radius * np.cos(self.t))
+                py.append(self.radius * np.sin(self.t))
             else:
                 px.append(px[-1])
                 py.append(py[-1])
