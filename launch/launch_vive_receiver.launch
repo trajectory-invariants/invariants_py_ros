@@ -1,0 +1,7 @@
+<launch>
+    <!-- Launch the rospy node -->
+    <node name="vive_data_receiver" pkg="invariants_py_ros" type="vive_data_receiver.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+</launch>
