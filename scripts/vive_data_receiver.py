@@ -33,7 +33,7 @@ class ROSViveDataReceiver:
         self.update_rate = rospy.Rate(60)
 
         # Create a ROS topic subscribers and publishers
-        self.publisher_vive_data = rospy.Publisher('/vive_data', Float32MultiArray, queue_size=10)
+        self.publisher_vive_data = rospy.Publisher('/vive_data', Pose, queue_size=10)
 
         # Initialize the data structure
         self.vive_data = Pose()
@@ -59,8 +59,7 @@ class ROSViveDataReceiver:
         while not rospy.is_shutdown():
     
             self.new_states = self.vr_system.getButtonsState(self.controllerName)
-            
-            self.vive_data.data = []
+
             # check trigger pressed
             if (self.prev_states["trigger"] == 0.0) and (self.new_states["trigger"] == 1.0):
                 self.start_time = time.time()   
@@ -69,7 +68,7 @@ class ROSViveDataReceiver:
             if self.new_states["trigger"] == 1.0:
                 quat = self.vr_system.getQuaternion(self.lightHouse, self.trackerName)
                 elapsed_time = time.time()- self.start_time
-                print ("elapsed time IS:" + str(elapsed_time))
+                # print ("elapsed time IS:" + str(elapsed_time))
                 self.vive_data.position.x = quat[0]
                 self.vive_data.position.y = quat[1]
                 self.vive_data.position.z = quat[2]
@@ -83,7 +82,7 @@ class ROSViveDataReceiver:
                 print ("STOP RECORDING POSES")
 
             self.publisher_vive_data.publish(self.vive_data)
-            print(self.vive_data.position.x, self.vive_data.position.y, self.vive_data.position.z)
+            # print(self.vive_data.position.x, self.vive_data.position.y, self.vive_data.position.z)
 
             self.prev_states = self.new_states.copy()
             self.update_rate.sleep()

@@ -6,7 +6,7 @@
         <param name="your_parameter_name" type="int" value="1" />
     </node>
 
-    <node name="invariants_calculation_position" pkg="invariants_py_ros" type="invariants_calculation_position.py" output="screen">
+    <node name="invariants_calculation_position_live" pkg="invariants_py_ros" type="invariants_calculation_position_live.py" output="screen">
         <!-- Optional rosparam parameter with default value of 1 -->
         <param name="your_parameter_name" type="int" value="1" />
     </node>

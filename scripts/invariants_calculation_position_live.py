@@ -24,8 +24,11 @@ class ROSInvariantsCalculationPositionLive:
 
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/vive_data', Pose, self.callback_vive_data)
+        self.publisher_invariants_position = rospy.Publisher('/invariants_position_result', std_msgs.msg.Float32MultiArray, queue_size=10)
+        self.publisher_traj_calc_array = rospy.Publisher('/trajectory_online_array', std_msgs.msg.Float32MultiArray, queue_size=10)
 
-        # Define parameters of the window of measurements
+        # Define parameters of the window of measurements)
+
         self.window_nb_samples = 21 # number of samples in window for the given horizon length
         self.window_horizon_length = 2.0 # size of the window in time [sec]
         
@@ -65,10 +68,11 @@ class ROSInvariantsCalculationPositionLive:
                 print(f"Filling window: {number_window_samples} out of {self.window_nb_samples}")
             #print(self.window_measured_positions)
                 
-    def callback_vive(self, pose_msg):
+    def callback_vive_data(self, pose_msg):
         # Callback function to process the received Pose message
         new_position = np.array([pose_msg.position.x, pose_msg.position.y, pose_msg.position.z])
-        
+        # print(new_position)
+
         # Update window of measurements
         self.build_time_window(new_position)
 
@@ -93,9 +97,10 @@ class ROSInvariantsCalculationPositionLive:
                 # print(invariants_pos)
 
                 invariants_pos_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(invariants_pos)
+                traj_float32_array = helper_functions_ros.convert_nparray_to_Float32MultiArray(traj)
 
                 self.publisher_invariants_position.publish(invariants_pos_float32_array)
-                
+                self.publisher_traj_calc_array.publish(traj_float32_array)
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 

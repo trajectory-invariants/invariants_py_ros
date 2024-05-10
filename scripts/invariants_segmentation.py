@@ -113,9 +113,13 @@ class ROSInvariantsSegmentation:
             self.previous_distance_to_segment = self.distance_to_segment
         self.distance_to_segment = self.dtw_distance(pos_1, references[0], band_size_v1)
 
+        # if self.distance_to_segment > self.previous_distance_to_segment:
+        #     print('DTW DISTANCE:', self.previous_distance_to_segment)
+        # print('DTW DISTANCE:', self.previous_distance_to_segment)
+
         # Segment is only recognized if the DTW distance is below the threshold and the distance is increasing
         if (self.previous_distance_to_segment < distance_threshold) and (self.distance_to_segment > self.previous_distance_to_segment):
-            self.segment_found.data = True        
+            self.segment_found.data = True   
         else:
             self.segment_found.data = False
 
