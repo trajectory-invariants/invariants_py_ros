@@ -24,6 +24,7 @@ class ROSInvariantsCalculationPosition:
 
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/pose_data', Pose, self.callback_pose)
+
         self.publisher_invariants_position = rospy.Publisher('/invariants_position_result', std_msgs.msg.Float32MultiArray, queue_size=10)   
         self.publisher_traj_calc_array = rospy.Publisher('/trajectory_online_array', std_msgs.msg.Float32MultiArray, queue_size=10)
         self.publisher_traj_calc = rospy.Publisher('/trajectory_online', Marker, queue_size=10)

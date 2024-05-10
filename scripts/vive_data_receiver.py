@@ -4,7 +4,7 @@
 import rospy
 import vr_system as vr
 import time
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Pose
 
 def selectController(handoverSetup):
     """
@@ -36,7 +36,7 @@ class ROSViveDataReceiver:
         self.publisher_vive_data = rospy.Publisher('/vive_data', Float32MultiArray, queue_size=10)
 
         # Initialize the data structure
-        self.vive_data = Float32MultiArray()
+        self.vive_data = Pose()
 
         # Initialize the VR system
         self.vr_system = vr.VR_system()
@@ -66,18 +66,24 @@ class ROSViveDataReceiver:
                 self.start_time = time.time()   
                 print ("START RECORDING POSES")
                 
-            if new_states["trigger"] == 1.0:
+            if self.new_states["trigger"] == 1.0:
                 quat = self.vr_system.getQuaternion(self.lightHouse, self.trackerName)
                 elapsed_time = time.time()- self.start_time
                 print ("elapsed time IS:" + str(elapsed_time))
-                self.vive_data.data = [elapsed_time, quat[0], quat[1], quat[2], quat[3], quat[4], quat[5], quat[6]]
+                self.vive_data.position.x = quat[0]
+                self.vive_data.position.y = quat[1]
+                self.vive_data.position.z = quat[2]
+                self.vive_data.orientation.x = quat[3]
+                self.vive_data.orientation.y = quat[4]
+                self.vive_data.orientation.z = quat[5]
+                self.vive_data.orientation.w = quat[6]
             
             # check trigger released
             if (self.prev_states["trigger"] == 1.0) and (self.new_states["trigger"] == 0.0):
                 print ("STOP RECORDING POSES")
 
             self.publisher_vive_data.publish(self.vive_data)
-            print(self.vive_data.data)
+            print(self.vive_data.position.x, self.vive_data.position.y, self.vive_data.position.z)
 
             self.prev_states = self.new_states.copy()
             self.update_rate.sleep()

@@ -1,0 +1,29 @@
+<launch>
+
+    <!-- Launch the rospy node -->
+    <node name="vive_data_receiver" pkg="invariants_py_ros" type="vive_data_receiver.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <node name="invariants_calculation_position" pkg="invariants_py_ros" type="invariants_calculation_position.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <node name="invariants_segmentation" pkg="invariants_py_ros" type="invariants_segmentation.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <node name="invariants_classification" pkg="invariants_py_ros" type="invariants_classification.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>
+
+    <node name="robot_simulation" pkg="invariants_py_ros" type="robot_simulation.py" output="screen">
+        <!-- Optional rosparam parameter with default value of 1 -->
+        <param name="your_parameter_name" type="int" value="1" />
+    </node>    
+
+</launch>
