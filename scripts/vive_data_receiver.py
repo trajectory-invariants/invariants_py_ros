@@ -4,7 +4,7 @@
 import rospy
 import vr_system as vr
 import time
-from std_msgs.msg import Pose
+from geometry_msgs.msg import Pose
 
 def selectController(handoverSetup):
     """
