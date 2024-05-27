@@ -107,7 +107,8 @@ class ROSInvariantsClassification:
         
         # Specify the orientation of the vertical vector
         # vertical_vector = np.array([0.1, 0.4, 0.7])
-        vertical_vector = np.array([0, 1, 0])
+        # vertical_vector = np.array([0, 1, 0])
+        vertical_vector = np.array([0.06, 0.43, 0.55])
 
         # Distance traveled in each direction
         x_dist = traj_x[-1] - traj_x[0]
