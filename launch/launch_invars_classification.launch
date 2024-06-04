@@ -21,6 +21,6 @@
     </node>    
 
     <!-- Play rosbag file with the loop flag and at 50% speed as original-->
-    <node name="rosbag_play" pkg="rosbag" type="play" args="-r 0.99 $(find invariants_py_ros)/data/forced_gestures_pose.bag" />
+    <node name="rosbag_play" pkg="rosbag" type="play" args="-r 0.99 $(find invariants_py_ros)/data/trans_hor.bag" />
 
 </launch>

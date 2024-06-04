@@ -76,11 +76,11 @@ class ROSRobotSimulation:
         
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
-        print(px)
-        print(py)
+        # print(px)
+        # print(py)
         np.save('px.npy', px)
         np.save('py.npy', py)
-        print(os.path.abspath("."))
+        # print(os.path.abspath("."))
 
 
 
