@@ -73,10 +73,17 @@ class ROSInvariantsCalculationPosition:
                 
     def callback_pose(self, pose_msg):
         # Callback function to process the received Pose message
-        new_position = np.array([pose_msg.position.x, pose_msg.position.y, pose_msg.position.z])
+        new_position = np.array([pose_msg.position.x, pose_msg.position.y, pose_msg.position.z,1])
+
+        pose_matrix = np.array([[1, 0, 0, 0],[0, 1, 0, 0],[0, 0, 1, 0],[0, 0, 0, 1]])
+        # pose_matrix = np.array([[0.866, 0.5, 0, -1.5],[-0.5, 0.866, 0, 2.3],[0, 0, 1, 1.0],[0, 0, 0, 1]])
+        # pose_matrix = np.array([[0.866, 0, 0.5, 1.0],[0.433, 0.707, -0.612, -0.5],[-0.5, 0.707, 0.354, 0.7],[0, 0, 0, 1]])
+        # pose_matrix = np.array([[0.5, -0.866, 0.433, 0.5],[0.866, 0.354, -0.25, 1.2],[-0.5, 0.5, 0.707, -0.3],[0, 0, 0, 1]])
+
+        new_position = np.matmul(pose_matrix,new_position)
         
         # Update window of measurements
-        self.build_time_window(new_position)
+        self.build_time_window(new_position[0:3])
 
         # Create a Marker message for the sphere
         marker = Marker()
@@ -142,6 +149,9 @@ class ROSInvariantsCalculationPosition:
 
                 self.publisher_invariants_position.publish(invariants_pos_float32_array)
                 self.publisher_traj_calc_array.publish(traj_float32_array)
+
+                # print('INVARIANTS PUBLISHED: ', rospy.get_time()-self.starttime)
+                # print(max(invariants_pos_float32_array.data[0::3]))
 
                 # Add points to the marker
                 marker.points = []

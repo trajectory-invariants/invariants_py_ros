@@ -54,7 +54,8 @@ class ROSInvariantsSegmentation:
     def callback_invariants_position(self, data):
         
         # Split data into correct invariants
-        self.pos_1.data = data.data[0::3] # Every third value, starting from the first
+        if len(data.data) != 0:
+            self.pos_1.data = data.data[0::3] # Every third value, starting from the first
         # self.pos_2.data = data.data[1::3] # Every third value, starting from the second
         # self.pos_3.data = data.data[2::3] # Every third value, starting from the third
         
@@ -120,8 +121,18 @@ class ROSInvariantsSegmentation:
         # Segment is only recognized if the DTW distance is below the threshold and the distance is increasing
         if (self.previous_distance_to_segment < distance_threshold) and (self.distance_to_segment > self.previous_distance_to_segment):
             self.segment_found.data = True   
+            print(self.pos_1.data)
+        elif max(self.pos_1.data[8:12]) > 3.0:
+            self.segment_found.data = True
+            print(self.pos_1.data)
         else:
             self.segment_found.data = False
+        
+        if max(self.pos_1.data) > 1000.0:
+            rospy.signal_shutdown('Shutting down due to large values')
+
+        # if (rospy.get_time() - self.starting_time) > 22 and (rospy.get_time() - self.starting_time) < 23:
+        #     print(self.pos_1.data)
 
 
     # def dtw_classification(self, rot_1, references):
@@ -161,11 +172,11 @@ class ROSInvariantsSegmentation:
     def run(self):
         # Arbitrary values, could be defined more vigorously
         references = np.zeros((5,15)) 
-        references[0] = [-0.013336, 0.123938, 0.412655, 0.896227, 1.484626, 2.107109, 2.689924, 3.118931, 3.179457, 2.759977, 2.030783, 1.145614, 0.576452, 0.367894, 0.246758]
-        references[1] = [-1.053221, -0.922412, -0.391974, 0.729533, 2.538487, 4.851655, 7.073614, 8.322857, 7.943930, 6.293696, 4.106775, 2.219112, 0.952984, 0.213465, -0.106656]
-        references[2] = [-0.704372, -0.737801, -0.749550, -0.718569, -0.601639, -0.314620, 0.265431, 1.226275, 2.349643, 2.815916, 2.225132, 1.232017, 0.754472, 0.686508, 0.618684]
-        references[3] = [2.175058, 2.753868, 3.419728, 4.186294, 5.051172, 5.798532, 6.173445, 5.981571, 5.390303, 4.496642, 3.626515, 2.950756, 2.332041, 1.820430, 1.368183]
-        references[4] = [0.089681, 0.242293, 0.409137, 0.589363, 0.785925, 1.014047, 1.265902, 1.516832, 1.751753, 1.898293, 1.903506, 1.736325, 1.410860, 1.096605, 0.778782]
+        references[0] = 1.5*np.array([-0.013336, 0.123938, 0.412655, 0.896227, 1.484626, 2.107109, 2.689924, 3.118931, 3.179457, 2.759977, 2.030783, 1.145614, 0.576452, 0.367894, 0.246758])
+        references[1] = np.array([-1.053221, -0.922412, -0.391974, 0.729533, 2.538487, 4.851655, 7.073614, 8.322857, 7.943930, 6.293696, 4.106775, 2.219112, 0.952984, 0.213465, -0.106656])
+        references[2] = np.array([-0.704372, -0.737801, -0.749550, -0.718569, -0.601639, -0.314620, 0.265431, 1.226275, 2.349643, 2.815916, 2.225132, 1.232017, 0.754472, 0.686508, 0.618684])
+        references[3] = np.array([2.175058, 2.753868, 3.419728, 4.186294, 5.051172, 5.798532, 6.173445, 5.981571, 5.390303, 4.496642, 3.626515, 2.950756, 2.332041, 1.820430, 1.368183])
+        references[4] = np.array([0.089681, 0.242293, 0.409137, 0.589363, 0.785925, 1.014047, 1.265902, 1.516832, 1.751753, 1.898293, 1.903506, 1.736325, 1.410860, 1.096605, 0.778782])
         distance_threshold = 15
 
         while not rospy.is_shutdown():
