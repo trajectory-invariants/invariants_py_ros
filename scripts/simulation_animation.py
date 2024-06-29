@@ -35,18 +35,18 @@ def robot_simulation(p_x, p_y):
 
     t = np.linspace(0, 2*np.pi, 100)
     x_circ_1 = np.cos(t)
-    x_circ_2 = 2*np.cos(t)
-    x_ellipse_1 = 2*np.cos(t)
-    x_ellipse_2 = 4*np.cos(t)
+    # x_circ_2 = 2*np.cos(t)
+    # x_ellipse_1 = 2*np.cos(t)
+    # x_ellipse_2 = 4*np.cos(t)
     y_circ_1 = np.sin(t)
-    y_circ_2 = 2*np.sin(t)
-    y_ellipse_1 = np.sin(t)
-    y_ellipse_2 = 2*np.sin(t)
+    # y_circ_2 = 2*np.sin(t)
+    # y_ellipse_1 = np.sin(t)
+    # y_ellipse_2 = 2*np.sin(t)
 
     ax.plot(x_circ_1, y_circ_1, lw='1', c='b')
-    ax.plot(x_circ_2, y_circ_2, lw='1', c='b')
-    ax.plot(x_ellipse_1, y_ellipse_1, lw='1', c='b')
-    ax.plot(x_ellipse_2, y_ellipse_2, lw='1', c='b')
+    # ax.plot(x_circ_2, y_circ_2, lw='1', c='b')
+    # ax.plot(x_ellipse_1, y_ellipse_1, lw='1', c='b')
+    # ax.plot(x_ellipse_2, y_ellipse_2, lw='1', c='b')
 
     line_ani.save('robot_simulation.gif')
 

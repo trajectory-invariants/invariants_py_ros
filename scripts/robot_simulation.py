@@ -17,14 +17,15 @@ class ROSRobotSimulation:
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/gesture', Int32, self.callback_gesture)
 
+        self.starttime = rospy.get_time()
 
         # Initialize the gesture as the correct message types
         self.gesture = Int32()  
 
         # Initialize the robot simulation
-        self.radius = 1
-        self.contour = 1
-        self.status = 1
+        self.speed = 1
+        self.direction = 1
+        self.status = 0
         self.t = 0
     
     
@@ -32,29 +33,44 @@ class ROSRobotSimulation:
         
         self.gesture.data = data.data
 
-        if self.gesture.data == 1:
-            self.contour = 1
+        # if self.gesture.data == 1: # ROT HOR
+        #     self.direction = -1
 
-        elif self.gesture.data == 2:
+        # elif self.gesture.data == 2: # ROT UP
+        #     self.direction = 1
+
+        # elif self.gesture.data == 3: # ROT DOWN
+        #     self.status = 1
+
+        # elif self.gesture.data == 4: # TRANS HOR
+        #     self.status = 0
+
+        # elif self.gesture.data == 5: # TRANS UP
+        #     self.speed = 0.5
+            
+        # elif self.gesture.data == 6: # TRANS DOWN
+        #     self.speed = 1
+
+        if 4.1 < rospy.get_time() - self.starttime < 4.5:
             self.status = 1
 
-        elif self.gesture.data == 3:
+        if 9.6 < rospy.get_time() - self.starttime < 10.1:
+            self.speed = 0.5
+        
+        if 15.6 < rospy.get_time() - self.starttime < 16.1:
+            self.direction = -1
+
+        if 20.6 < rospy.get_time() - self.starttime < 21.1:
+            self.speed = 1
+
+        if 24.6 < rospy.get_time() - self.starttime < 25.1:
             self.status = 0
-
-        elif self.gesture.data == 4:
-            self.contour = 2
-
-        elif self.gesture.data == 5:
-            self.radius = 2
-            
-        elif self.gesture.data == 6:
-            self.radius = 1
-
     
     def run(self):
         
         px = [1]
         py = [0]
+        
         
 
         while not rospy.is_shutdown():
@@ -66,9 +82,12 @@ class ROSRobotSimulation:
 
 
             if self.status == 1:
-                self.t += 2*np.pi/90
-                px.append(self.contour * self.radius * np.cos(self.t))
-                py.append(self.radius * np.sin(self.t))
+                if self.direction == 1:
+                    self.t += 2*np.pi/90
+                elif self.direction == -1:
+                    self.t -= 2*np.pi/90
+                px.append(np.cos(self.speed * self.t))
+                py.append(np.sin(self.speed * self.t))
             else:
                 px.append(px[-1])
                 py.append(py[-1])
