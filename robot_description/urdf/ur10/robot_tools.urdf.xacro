@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+       name="robot" >
+
+  <!-- ur5 -->
+<!--   <xacro:include filename="$(find ur_description)/urdf/ur5.urdf.xacro" /> -->
+  <!-- <xacro:include filename="$(find ur_description)/urdf/ur10.urdf.xacro" /> -->
+  <xacro:include filename="$(find ur_description)/urdf/ur10.urdf.xacro" />
+
+
+<xacro:macro name="robot" params="parent *origin">
+  <joint name="robot_base_joint" type="fixed">
+    <xacro:insert_block name="origin" />
+    <parent link="${parent}"/>
+    <child link="base_link" />
+  </joint>
+
+  <!-- arm -->
+<!--   <xacro:ur5_robot prefix="" joint_limited="true"/> -->
+  <!-- <xacro:ur10_robot prefix="" joint_limited="true"/> -->
+  <xacro:ur10_robot prefix="" joint_limited="false"/>
+
+  <!-- load cell -->
+  <joint name="load_cell_joint" type="fixed">
+    <parent link="tool0"/>
+    <child link="load_cell_link"/>
+    <origin xyz="0 0 ${40.3*0.001}" rpy="${0} ${0} ${0}"/>
+  </joint>
+
+  <link name="load_cell_link" >
+    <visual>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/nordbo_NRS_6_D80.stl" scale=".001 .001 .001"/>
+      </geometry>
+      <material name="Blue">
+        <color rgba="0 0 0.8 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/nordbo_NRS_6_D80.stl" scale=".001 .001 .001"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- adaptor -->
+  <joint name="adaptor_joint" type="fixed">
+    <parent link="load_cell_link"/>
+    <child link="adaptor_link"/>
+    <origin xyz="0.0 0 ${0.0062+0.01*0.5}" rpy="0 0 ${0}"/>
+  </joint>
+
+  <link name="adaptor_link" >
+    <visual>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/adaptor.stl" scale=".001 .001 .001"/>
+      </geometry>
+      <material name="Dark_Grey">
+        <color rgba="0.4 0.4 0.4 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/adaptor.stl" scale=".001 .001 .001"/>
+      </geometry>
+    </collision>
+  </link>
+
+
+  <!-- tool -->
+  <joint name="tool_joint" type="fixed">
+    <parent link="adaptor_link" />
+    <child link="tool_frame" />
+    <origin xyz="0 0 ${0.009+0.005}" rpy="0 ${pi} ${pi/4}" />
+
+  </joint>
+   <link name="tool_frame" >
+  </link>
+
+  <!-- TCP -->
+  <joint name="TCP_joint" type="fixed">
+    <parent link="tool_frame" />
+    <child link="TCP_frame" />
+    <origin xyz="0 -0.095 0" rpy="0 0 0" /> 
+
+  </joint>
+   <link name="TCP_frame" >
+    <visual>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/opener.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="Red">
+        <color rgba="0.5 0 0 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/opener.stl" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+
+</xacro:macro>
+
+</robot>

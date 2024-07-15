@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="environment">
+  <!-- Macro objects -->
+
+  <!-- table -->
+    <xacro:macro name="table" params="name parent height *origin">
+      <joint name="${name}_table_joint" type="fixed">
+        <xacro:insert_block name="origin"/>
+        <parent link="${parent}"/>
+        <child link="${name}_table_link"/>
+      </joint>
+
+      <link name="${name}_table_link" >
+        <visual>
+          <origin xyz="0.500 0.190 -${0.025/2 + 0.012}"/>
+          <geometry>
+            <box size="1.580 0.840 0.025"/>
+          </geometry>
+          <material name="White">
+          <color rgba="1 1 1 1"/>
+          </material>
+        </visual>
+
+      </link>
+  </xacro:macro>
+
+</robot>

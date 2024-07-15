@@ -6,7 +6,7 @@
     </node>
 
     <!-- Launch the rospy node -->
-    <node name="generate_trajectory" pkg="invariants_py_ros" type="trajectory_generation.py" output="screen">
+    <node name="generate_trajectory" pkg="invariants_py_ros" type="trajectory_generation_robot.py" output="screen">
         <!-- Optional rosparam parameter with default value of 1 -->
         <param name="your_parameter_name" type="int" value="1" />
     </node>

@@ -5,13 +5,13 @@
 import rospy
 import numpy as np
 from geometry_msgs.msg import Pose, PoseStamped
-import invariants_py.rockit_calculate_vector_invariants_position_mj as invariants_calculation
+import invariants_py.calculate_invariants.rockit_calculate_vector_invariants_position_mj as invariants_calculation
 import std_msgs.msg
 import helper_functions_ros
 from nav_msgs.msg import Path
 import rospkg
 from invariants_py import data_handler as rw
-from invariants_py import rockit_generate_position_from_vector_invariants as OCP_gen
+from invariants_py.generate_trajectory import rockit_generate_position_traj_from_vector_invars as OCP_gen
 import invariants_py.spline_handler as sh
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
