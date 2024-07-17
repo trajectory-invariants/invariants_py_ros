@@ -22,7 +22,7 @@ class SimulateTargetPose:
             angle = 2 * np.pi * self.frequency * (current_time - start_time)
             self.pose.position.x = self.radius * np.cos(angle)
             self.pose.position.y = self.radius * np.sin(angle)
-            self.pose.position.z = 1.0
+            self.pose.position.z = 0.5
 
             # Keep the orientation constant
             quaternion = quaternion_from_euler(0, 0, 0)
@@ -36,7 +36,7 @@ class SimulateTargetPose:
 
 if __name__ == '__main__':
     try:
-        simulator = SimulateTargetPose(radius=1.0, frequency=0.1)
+        simulator = SimulateTargetPose(radius=0.5, frequency=0.1)
         simulator.simulate_motion()
     except rospy.ROSInterruptException:
         pass

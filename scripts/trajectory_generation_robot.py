@@ -16,6 +16,10 @@ import invariants_py.spline_handler as sh
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
 from sensor_msgs.msg import JointState
+from invariants_py.kinematics.rigidbody_kinematics import orthonormalize_rotation as orthonormalize
+from invariants_py.kinematics.orientation_kinematics import rotate_x
+import matplotlib.pyplot as plt
+import invariants_py.plotting_functions.plotters as pl
 
 class ROSInvariantTrajectoryGeneration:
     def __init__(self, invariant_model_location):
@@ -67,6 +71,15 @@ class ROSInvariantTrajectoryGeneration:
         progress_values = np.linspace(current_progress, arclength_n[-1], number_samples)
 
         # new constraints
+        # retrieving data from file.
+        # p_obj = np.loadtxt("beer_pobj.csv", delimiter=",")
+        # loaded_Robj = np.loadtxt("beer_Robj.csv", delimiter=",")
+        # Robj = loaded_Robj.reshape(loaded_Robj.shape[0], loaded_Robj.shape[1] // 3, 3)
+        # loaded_FSt = np.loadtxt("beer_FSt.csv", delimiter=",")
+        # FSt = loaded_FSt.reshape(loaded_FSt.shape[0], loaded_FSt.shape[1] // 3, 3)
+        # loaded_FSr = np.loadtxt("beer_FSt.csv", delimiter=",")
+        # FSr = loaded_FSr.reshape(loaded_FSr.shape[0], loaded_FSr.shape[1] // 3, 3)
+        
         # current_index = 0
         # p_obj_start = optim_calc_results.Obj_pos[current_index]
         # R_obj_start = orthonormalize(optim_calc_results.Obj_frames[current_index])
@@ -90,27 +103,27 @@ class ROSInvariantTrajectoryGeneration:
 
         boundary_constraints = {
             "position": {
-                "initial": np.array([0,0,0]),
-                "final": np.array([0.827,0.7144,0.552])
+                "initial": np.array([0.3056, 0.0635, 0.441]), #p_obj[0], #
+                "final": np.array([0.69,0.244,0.4]) #p_obj[-1] #np.array([0.827,0.144,0.552]) 
             },
             "orientation": {
-                "initial": np.eye(3),
-                "final": np.eye(3)
+                "initial": np.eye(3), #orthonormalize(Robj[0]),
+                "final": rotate_x(np.pi/8) #orthonormalize(Robj[-1])
             },
             "moving-frame": {
                 "translational": {
-                    "initial": np.eye(3),
-                    "final": np.eye(3)
+                    "initial": np.eye(3), #orthonormalize(FSt[0]),
+                    "final": rotate_x(np.pi/8) #orthonormalize(FSt[-1])
                 },
                 "rotational": {
-                    "initial": np.eye(3),
-                    "final": np.eye(3)
+                    "initial": np.eye(3), #orthonormalize(FSr[0]),
+                    "final": rotate_x(np.pi/8) #orthonormalize(FSr[-1])
                 }
             },
         }
 
         robot_params = {
-            "urdf_file_name": 'ur10.urdf', # use None if do not want to include robot model
+            "urdf_file_name": None, # use None if do not want to include robot model
             "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values
             "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
             # "joint_number": 6, # Number of joints (if empty it is automatically taken from urdf file)
@@ -149,11 +162,25 @@ class ROSInvariantTrajectoryGeneration:
         while not rospy.is_shutdown():
 
             # Specify the boundary constraints
-            boundary_constraints["position"]["initial"] = [0, 0, 0]
-            boundary_constraints["position"]["final"] = self.target_position
+            boundary_constraints["position"]["initial"] = np.array([0.3056, 0.0635, 0.441]) #p_obj[0]#
+            boundary_constraints["position"]["final"] = self.target_position #np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #p_obj[-1]#
+            print(self.target_position)
+            
 
             # Generate trajectory
             invariants, pos, R_obj, R_t, R_r, time, joint_values = FS_online_generation_problem.generate_trajectory(model_invariants,boundary_constraints,progress_step,weights_params)
+
+            # fig = plt.figure(figsize=(14,8))
+            # ax = fig.add_subplot(111, projection='3d')
+            # ax.plot(p_obj[:,0],p_obj[:,1],p_obj[:,2],'b')
+            # ax.plot(pos[:,0],pos[:,1],pos[:,2],'r')
+            # pl.plot_invariants(model_invariants, invariants, arclength_n, progress_values)
+            # indx_online = np.trunc(np.linspace(0,len(pos)-1,5))
+            # indx_online = indx_online.astype(int)
+            # for i in indx_online:
+            #     pl.plot_3d_frame(p_obj[i,:],Robj[i,:,:],1,0.01,['red','green','blue'],ax)
+            #     pl.plot_3d_frame(pos[i,:],R_obj[i,:,:],1,0.01,['red','green','blue'],ax)
+            # plt.show()
 
             # Add points to the marker
             marker.points = []
@@ -177,7 +204,7 @@ if __name__ == '__main__':
     try:
         # Create and initialize ROS node
         rospack = rospkg.RosPack()
-        model_filename = rospack.get_path("invariants_py_ros")+"/data/"+"sinus_invariants.csv"
+        model_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_inv.csv"
         
         ros_traj_gen_node = ROSInvariantTrajectoryGeneration(model_filename)
         
