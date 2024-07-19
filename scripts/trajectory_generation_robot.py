@@ -205,10 +205,12 @@ class ROSInvariantTrajectoryGeneration:
             robot = urdf.URDF.load(path_to_urdf)
             joints = JointState()
             joints.name = [robot._actuated_joints[i].name for i in range(robot.num_actuated_joints)]
-            joints.position = joint_values[-1]
-            joints.header.stamp = rospy.Time.now()
-            print(joint_values[-1])
-            self.joint_values.publish(joints)
+            for i in range(invariants.shape[0]):
+                joints.position = joint_values[i]
+                joints.header.stamp = rospy.Time.now()
+                print(joint_values[i])
+                self.joint_values.publish(joints)
+                rospy.sleep(0.1)
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 

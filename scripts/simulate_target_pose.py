@@ -36,7 +36,7 @@ class SimulateTargetPose:
 
 if __name__ == '__main__':
     try:
-        simulator = SimulateTargetPose(radius=0.1, frequency=0.1)
+        simulator = SimulateTargetPose(radius=0, frequency=0.1)
         simulator.simulate_motion()
     except rospy.ROSInterruptException:
         pass
