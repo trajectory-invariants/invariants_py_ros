@@ -164,17 +164,17 @@ class ROSInvariantTrajectoryGeneration:
         marker.color.a = 1.0
         marker.color.r = 1.0
 
-
-        # Specify the boundary constraints
-        boundary_constraints["position"]["initial"] = self.p_obj[0]# np.array([0.3056, 0.0635, 0.441]) #
-        boundary_constraints["position"]["final"] = self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #self.target_position # 
-        print(self.target_position)
-        
-
-        # Generate trajectory
-        invariants, pos, R_obj, R_t, R_r, time, joint_values = FS_online_generation_problem.generate_trajectory(model_invariants,boundary_constraints,progress_step,weights_params,initial_values)
-
         while not rospy.is_shutdown():
+
+            # Specify the boundary constraints
+            boundary_constraints["position"]["initial"] = self.p_obj[0]# np.array([0.3056, 0.0635, 0.441]) #
+            boundary_constraints["position"]["final"] = self.target_position # self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #
+            print(self.target_position)
+            
+
+            # Generate trajectory
+            invariants, pos, R_obj, R_t, R_r, time, joint_values = FS_online_generation_problem.generate_trajectory(model_invariants,boundary_constraints,progress_step,weights_params,initial_values)
+
             # fig = plt.figure(figsize=(14,8))
             # ax = fig.add_subplot(111, projection='3d')
             # ax.plot(self.p_obj[:,0],self.p_obj[:,1],self.p_obj[:,2],'b')
