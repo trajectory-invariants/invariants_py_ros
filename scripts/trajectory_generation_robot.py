@@ -17,12 +17,15 @@ from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
 from sensor_msgs.msg import JointState
 from invariants_py.kinematics.rigidbody_kinematics import orthonormalize_rotation as orthonormalize
-from invariants_py.kinematics.orientation_kinematics import rotate_x
 import matplotlib.pyplot as plt
 import invariants_py.plotting_functions.plotters as pl
+from scipy.spatial.transform import Rotation as R
+from invariants_py.initialization import initial_trajectory_movingframe_rotation as FSr_init
+from invariants_py.reparameterization import interpR
+import yourdfpy as urdf
 
 class ROSInvariantTrajectoryGeneration:
-    def __init__(self, invariant_model_location):
+    def __init__(self, invariant_model_location,pos_location,R_location,FSt_location,FSr_location):
         rospy.init_node('ros_trajectory_generation', anonymous=True)
         self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
         
@@ -35,6 +38,14 @@ class ROSInvariantTrajectoryGeneration:
         # Initialize invariant trajectory generation problem
         self.invariant_model = rw.read_invariants_from_csv(invariant_model_location)
         self.target_position = [1.1,0.0,0.0]
+
+        self.p_obj = np.loadtxt(pos_location, delimiter=",")
+        loaded_Robj = np.loadtxt(R_location, delimiter=",")
+        self.Robj = loaded_Robj.reshape(loaded_Robj.shape[0], loaded_Robj.shape[1] // 3, 3)
+        loaded_FSt = np.loadtxt(FSt_location, delimiter=",")
+        self.FSt = loaded_FSt.reshape(loaded_FSt.shape[0], loaded_FSt.shape[1] // 3, 3)
+        loaded_FSr = np.loadtxt(FSr_location, delimiter=",")
+        self.FSr = loaded_FSr.reshape(loaded_FSr.shape[0], loaded_FSr.shape[1] // 3, 3)
 
     def callback_target_pose(self, pose_msg):
         # Callback function to process the received Pose message
@@ -70,60 +81,41 @@ class ROSInvariantTrajectoryGeneration:
 
         progress_values = np.linspace(current_progress, arclength_n[-1], number_samples)
 
-        # new constraints
-        # retrieving data from file.
-        # p_obj = np.loadtxt("beer_pobj.csv", delimiter=",")
-        # loaded_Robj = np.loadtxt("beer_Robj.csv", delimiter=",")
-        # Robj = loaded_Robj.reshape(loaded_Robj.shape[0], loaded_Robj.shape[1] // 3, 3)
-        # loaded_FSt = np.loadtxt("beer_FSt.csv", delimiter=",")
-        # FSt = loaded_FSt.reshape(loaded_FSt.shape[0], loaded_FSt.shape[1] // 3, 3)
-        # loaded_FSr = np.loadtxt("beer_FSt.csv", delimiter=",")
-        # FSr = loaded_FSr.reshape(loaded_FSr.shape[0], loaded_FSr.shape[1] // 3, 3)
-        
-        # current_index = 0
-        # p_obj_start = optim_calc_results.Obj_pos[current_index]
-        # R_obj_start = orthonormalize(optim_calc_results.Obj_frames[current_index])
-        # FSt_start = orthonormalize(optim_calc_results.FSt_frames[current_index])
-        # # FSr_start = orthonormalize(optim_calc_results.FSr_frames[current_index])
-        # p_obj_end = optim_calc_results.Obj_pos[-1] + np.array([1.15,-0.1,-0.1]) #np.array([0.827,0.7144,0.552]) #
-        # alpha = 0
-        # rotate = R.from_euler('z', alpha, degrees=True)
-        # R_obj_end =  orthonormalize(rotate.as_matrix() @ optim_calc_results.Obj_frames[-1])
-        # FSt_end = orthonormalize(rotate.as_matrix() @ optim_calc_results.FSt_frames[-1])
-        # # FSr_end = orthonormalize(optim_calc_results.FSr_frames[-1])
-
-        # # define new class for OCP results
-        # optim_gen_results = OCP_results(FSt_frames = [], FSr_frames = [], Obj_pos = [], Obj_frames = [], invariants = np.zeros((number_samples,6)))
+        # new constraints       
+        alpha = 0
+        rotate = R.from_euler('z', alpha, degrees=True)
+        Robj_end =  orthonormalize(rotate.as_matrix() @ self.Robj[-1])
+        FSt_end = orthonormalize(rotate.as_matrix() @ self.FSt[-1])
 
         # # Linear initialization
-        # R_obj_init = interpR(np.linspace(0, 1, len(optim_calc_results.Obj_frames)), [0,1], np.array([R_obj_start, R_obj_end]))
+        R_obj_init = interpR(np.linspace(0, 1, len(self.Robj)), [0,1], np.array([self.Robj[0], Robj_end]))
         # # R_r_init = interpR(np.linspace(0, 1, len(optim_calc_results.FSr_frames)), [0,1], np.array([FSr_start, FSr_end]))
 
-        # R_r_init, R_r_init_array, invars_init = FSr_init(R_obj_start, R_obj_end)
+        R_r_init, R_r_init_array, invars_init = FSr_init(self.Robj[0], Robj_end)
 
         boundary_constraints = {
             "position": {
-                "initial": np.array([0.3056, 0.0635, 0.441]), #p_obj[0], #
-                "final": np.array([0.69,0.244,0.4]) #p_obj[-1] #np.array([0.827,0.144,0.552]) 
+                "initial": self.p_obj[0], #np.array([0.3056, 0.0635, 0.441]), #
+                "final": np.array([0.69,0.244,0.4]) #self.p_obj[-1] #np.array([0.827,0.144,0.552]) 
             },
             "orientation": {
-                "initial": np.eye(3), #orthonormalize(Robj[0]),
-                "final": rotate_x(np.pi/8) #orthonormalize(Robj[-1])
+                "initial": orthonormalize(self.Robj[0]), #np.eye(3), #
+                "final": Robj_end #rotate_x(np.pi/16) #
             },
             "moving-frame": {
                 "translational": {
-                    "initial": np.eye(3), #orthonormalize(FSt[0]),
-                    "final": rotate_x(np.pi/8) #orthonormalize(FSt[-1])
+                    "initial": orthonormalize(self.FSt[0]), #np.eye(3), #
+                    "final": FSt_end #rotate_x(np.pi/8) #
                 },
                 "rotational": {
-                    "initial": np.eye(3), #orthonormalize(FSr[0]),
-                    "final": rotate_x(np.pi/8) #orthonormalize(FSr[-1])
+                    "initial": R_r_init, #np.eye(3), #
+                    "final": R_r_init #rotate_x(np.pi/8) #
                 }
             },
         }
 
         robot_params = {
-            "urdf_file_name": None, # use None if do not want to include robot model
+            "urdf_file_name": "ur10.urdf", # use None if do not want to include robot model
             "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values
             "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
             # "joint_number": 6, # Number of joints (if empty it is automatically taken from urdf file)
@@ -147,6 +139,19 @@ class ROSInvariantTrajectoryGeneration:
             "w_high_active": 0
         }
 
+        initial_values = {
+            "trajectory": {
+                "position": self.p_obj,
+                "orientation": R_obj_init
+            },
+            "moving-frame": {
+                "translational": self.FSt,
+                "rotational": R_r_init_array,
+            },
+            "invariants": model_invariants,
+            "joint-values": robot_params["q_init"] if robot_params["urdf_file_name"] is not None else {}
+        }
+
         # Create the Marker message
         marker = Marker()
         marker.header = std_msgs.msg.Header()
@@ -159,26 +164,26 @@ class ROSInvariantTrajectoryGeneration:
         marker.color.a = 1.0
         marker.color.r = 1.0
 
+
+        # Specify the boundary constraints
+        boundary_constraints["position"]["initial"] = self.p_obj[0]# np.array([0.3056, 0.0635, 0.441]) #
+        boundary_constraints["position"]["final"] = self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #self.target_position # 
+        print(self.target_position)
+        
+
+        # Generate trajectory
+        invariants, pos, R_obj, R_t, R_r, time, joint_values = FS_online_generation_problem.generate_trajectory(model_invariants,boundary_constraints,progress_step,weights_params,initial_values)
+
         while not rospy.is_shutdown():
-
-            # Specify the boundary constraints
-            boundary_constraints["position"]["initial"] = np.array([0.3056, 0.0635, 0.441]) #p_obj[0]#
-            boundary_constraints["position"]["final"] = self.target_position #np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #p_obj[-1]#
-            print(self.target_position)
-            
-
-            # Generate trajectory
-            invariants, pos, R_obj, R_t, R_r, time, joint_values = FS_online_generation_problem.generate_trajectory(model_invariants,boundary_constraints,progress_step,weights_params)
-
             # fig = plt.figure(figsize=(14,8))
             # ax = fig.add_subplot(111, projection='3d')
-            # ax.plot(p_obj[:,0],p_obj[:,1],p_obj[:,2],'b')
+            # ax.plot(self.p_obj[:,0],self.p_obj[:,1],self.p_obj[:,2],'b')
             # ax.plot(pos[:,0],pos[:,1],pos[:,2],'r')
             # pl.plot_invariants(model_invariants, invariants, arclength_n, progress_values)
             # indx_online = np.trunc(np.linspace(0,len(pos)-1,5))
             # indx_online = indx_online.astype(int)
             # for i in indx_online:
-            #     pl.plot_3d_frame(p_obj[i,:],Robj[i,:,:],1,0.01,['red','green','blue'],ax)
+            #     pl.plot_3d_frame(self.p_obj[i,:],self.Robj[i,:,:],1,0.01,['red','green','blue'],ax)
             #     pl.plot_3d_frame(pos[i,:],R_obj[i,:,:],1,0.01,['red','green','blue'],ax)
             # plt.show()
 
@@ -196,8 +201,15 @@ class ROSInvariantTrajectoryGeneration:
             self.publisher_traj_gen.publish(marker)
 
             # Move robot
-            self.joint_values = joint_values
-            q = JointState()
+            path_to_urdf = rw.find_robot_path(robot_params["urdf_file_name"])
+            robot = urdf.URDF.load(path_to_urdf)
+            joints = JointState()
+            joints.name = [robot._actuated_joints[i].name for i in range(robot.num_actuated_joints)]
+            joints.position = joint_values[-1]
+            joints.header.stamp = rospy.Time.now()
+            print(joint_values[-1])
+            self.joint_values.publish(joints)
+
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 
 if __name__ == '__main__':
@@ -205,8 +217,12 @@ if __name__ == '__main__':
         # Create and initialize ROS node
         rospack = rospkg.RosPack()
         model_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_inv.csv"
+        pos_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_pobj.csv"
+        R_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_Robj.csv"
+        FSt_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_FSt.csv"
+        FSr_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_FSr.csv"
         
-        ros_traj_gen_node = ROSInvariantTrajectoryGeneration(model_filename)
+        ros_traj_gen_node = ROSInvariantTrajectoryGeneration(model_filename,pos_filename,R_filename,FSt_filename,FSr_filename)
         
         # Run the loop of the node
         ros_traj_gen_node.run()

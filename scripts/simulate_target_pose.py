@@ -20,9 +20,9 @@ class SimulateTargetPose:
 
             # Set the position of the target pose, following a circular motion
             angle = 2 * np.pi * self.frequency * (current_time - start_time)
-            self.pose.position.x = self.radius * np.cos(angle)
-            self.pose.position.y = self.radius * np.sin(angle)
-            self.pose.position.z = 0.5
+            self.pose.position.x = 0.3056+self.radius * np.cos(angle)
+            self.pose.position.y = 0.0635+self.radius * np.sin(angle)
+            self.pose.position.z = 0.441+0.1
 
             # Keep the orientation constant
             quaternion = quaternion_from_euler(0, 0, 0)

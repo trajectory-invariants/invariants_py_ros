@@ -58,7 +58,7 @@ Visualization Manager:
       Marker Topic: /trajectory
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -66,9 +66,101 @@ Visualization Manager:
       Marker Topic: /target_pose_marker
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
+    - Alpha: 1
+      Class: rviz/RobotModel
+      Collision Enabled: false
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        TCP_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        adaptor_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        ee_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        forearm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        load_cell_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        shoulder_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        table_table_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        tool_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        upper_arm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        wrist_1_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wrist_2_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wrist_3_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Name: RobotModel
+      Robot Description: robot_description
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -113,9 +205,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.1903984099626541
+      Pitch: 0.2153983861207962
       Target Frame: <Fixed Frame>
-      Yaw: 0.6103981733322144
+      Yaw: 0.2054038792848587
     Saved: ~
 Window Geometry:
   Displays:
@@ -134,4 +226,4 @@ Window Geometry:
     collapsed: false
   Width: 1920
   X: 0
-  Y: 0
+  Y: 27
