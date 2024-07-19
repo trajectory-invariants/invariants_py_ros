@@ -26,8 +26,8 @@
 		<origin xyz="${x_w} ${y_w} ${z_w}" rpy="${roll_w} ${pitch_w} ${yaw_w}"/>
 	</xacro:table>
 
-	<xacro:bottle name="bottle" parent="world">
+	<!-- <xacro:bottle name="bottle" parent="world">
 		<origin xyz="${x_w} ${y_w} ${z_w}" rpy="${roll_w} ${pitch_w} ${yaw_w}"/>
-	</xacro:bottle>
+	</xacro:bottle> -->
 
 </robot>
