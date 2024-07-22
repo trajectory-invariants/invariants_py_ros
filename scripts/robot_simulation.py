@@ -33,38 +33,24 @@ class ROSRobotSimulation:
         
         self.gesture.data = data.data
 
-        # if self.gesture.data == 1: # ROT HOR
-        #     self.direction = -1
+        if self.gesture.data == 1: # ROT HOR
+             self.direction = -1
 
-        # elif self.gesture.data == 2: # ROT UP
-        #     self.direction = 1
+        elif self.gesture.data == 2: # ROT UP
+             self.direction = 1
 
-        # elif self.gesture.data == 3: # ROT DOWN
-        #     self.status = 1
+        elif self.gesture.data == 3: # ROT DOWN
+             self.status = 1
 
-        # elif self.gesture.data == 4: # TRANS HOR
-        #     self.status = 0
+        elif self.gesture.data == 4: # TRANS HOR
+             self.status = 0
 
-        # elif self.gesture.data == 5: # TRANS UP
-        #     self.speed = 0.5
+        elif self.gesture.data == 5: # TRANS UP
+             self.speed = 0.5
             
-        # elif self.gesture.data == 6: # TRANS DOWN
-        #     self.speed = 1
+        elif self.gesture.data == 6: # TRANS DOWN
+             self.speed = 1
 
-        if 4.1 < rospy.get_time() - self.starttime < 4.5:
-            self.status = 1
-
-        if 9.6 < rospy.get_time() - self.starttime < 10.1:
-            self.speed = 0.5
-        
-        if 15.6 < rospy.get_time() - self.starttime < 16.1:
-            self.direction = -1
-
-        if 20.6 < rospy.get_time() - self.starttime < 21.1:
-            self.speed = 1
-
-        if 24.6 < rospy.get_time() - self.starttime < 25.1:
-            self.status = 0
     
     def run(self):
         
