@@ -1,3 +1,4 @@
+# Real-time gesture recognition (thesis Kiron Plessers 2023-2024)
 This package shows how [invariants_py](https://github.com/trajectory-invariants/invariants_py) can be integrated in a ROS application.
 
 Currently there are two examples:
