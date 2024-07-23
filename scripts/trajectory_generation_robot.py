@@ -191,17 +191,17 @@ class ROSInvariantTrajectoryGeneration:
 
             # Publish trajectory
             trajectory = Trajectory()
-            pose = Pose()
-            pose.position.x = pos[0,0]
-            pose.position.y = pos[0,1]
-            pose.position.z = pos[0,2]
             quaternion = rot2quat(R_obj)
-            pose.orientation.x = quaternion[0,0]
-            pose.orientation.y = quaternion[0,1]
-            pose.orientation.z = quaternion[0,2]
-            pose.orientation.w = quaternion[0,3]
-            trajectory.header.stamp = rospy.Time.now()
-            trajectory.poses = [pose]
+            for i in range(invariants.shape[0]):
+                pose = Pose()
+                pose.position.x = pos[i,0]
+                pose.position.y = pos[i,1]
+                pose.position.z = pos[i,2]
+                pose.orientation.x = quaternion[i,0]
+                pose.orientation.y = quaternion[i,1]
+                pose.orientation.z = quaternion[i,2]
+                pose.orientation.w = quaternion[i,3]
+                trajectory.poses.append(pose)
             self.publisher_trajectory.publish(trajectory)
 
             # Add points to the marker
