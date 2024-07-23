@@ -23,6 +23,8 @@ from scipy.spatial.transform import Rotation as R
 from invariants_py.initialization import initial_trajectory_movingframe_rotation as FSr_init
 from invariants_py.reparameterization import interpR
 import yourdfpy as urdf
+from invariants_py.kinematics.orientation_kinematics import rot2quat
+from ros_spline_fitting_trajectory.msg import Trajectory
 
 class ROSInvariantTrajectoryGeneration:
     def __init__(self, invariant_model_location,pos_location,R_location,FSt_location,FSr_location):
@@ -31,9 +33,10 @@ class ROSInvariantTrajectoryGeneration:
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/target_pose', Pose, self.callback_target_pose)
-        self.publisher_traj_gen = rospy.Publisher('/trajectory', Marker, queue_size=10)
+        self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
         self.publisher_traj_meas = rospy.Publisher('/target_pose_marker', Marker, queue_size=10)
-        self.joint_values = rospy.Publisher('/joint_states', JointState, queue_size=10)
+        self.publisher_joint_values = rospy.Publisher('/joint_states', JointState, queue_size=10)
+        self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
 
         # Initialize invariant trajectory generation problem
         self.invariant_model = rw.read_invariants_from_csv(invariant_model_location)
@@ -59,9 +62,9 @@ class ROSInvariantTrajectoryGeneration:
         marker.type = marker.SPHERE
         marker.action = marker.ADD
         # Set marker properties
-        marker.scale.x = 0.1
-        marker.scale.y = 0.1
-        marker.scale.z = 0.1
+        marker.scale.x = 0.05
+        marker.scale.y = 0.05
+        marker.scale.z = 0.05
         marker.color.a = 1.0
         marker.color.r = 0.0
         marker.color.g = 0.0
@@ -169,7 +172,6 @@ class ROSInvariantTrajectoryGeneration:
             # Specify the boundary constraints
             boundary_constraints["position"]["initial"] = self.p_obj[0]# np.array([0.3056, 0.0635, 0.441]) #
             boundary_constraints["position"]["final"] = self.target_position # self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #
-            print(self.target_position)
             
 
             # Generate trajectory
@@ -187,6 +189,21 @@ class ROSInvariantTrajectoryGeneration:
             #     pl.plot_3d_frame(pos[i,:],R_obj[i,:,:],1,0.01,['red','green','blue'],ax)
             # plt.show()
 
+            # Publish trajectory
+            trajectory = Trajectory()
+            pose = Pose()
+            pose.position.x = pos[0,0]
+            pose.position.y = pos[0,1]
+            pose.position.z = pos[0,2]
+            quaternion = rot2quat(R_obj)
+            pose.orientation.x = quaternion[0,0]
+            pose.orientation.y = quaternion[0,1]
+            pose.orientation.z = quaternion[0,2]
+            pose.orientation.w = quaternion[0,3]
+            trajectory.header.stamp = rospy.Time.now()
+            trajectory.poses = [pose]
+            self.publisher_trajectory.publish(trajectory)
+
             # Add points to the marker
             marker.points = []
             for point in pos:  # Assuming traj is a numpy array of shape (number_samples, 3)
@@ -198,7 +215,7 @@ class ROSInvariantTrajectoryGeneration:
 
             # Publish the Marker
             marker.header.stamp = rospy.Time.now() # add timestamp
-            self.publisher_traj_gen.publish(marker)
+            self.publisher_traj_gen_marker.publish(marker)
 
             # Move robot
             path_to_urdf = rw.find_robot_path(robot_params["urdf_file_name"])
@@ -208,8 +225,8 @@ class ROSInvariantTrajectoryGeneration:
             for i in range(invariants.shape[0]):
                 joints.position = joint_values[i]
                 joints.header.stamp = rospy.Time.now()
-                print(joint_values[i])
-                self.joint_values.publish(joints)
+                # print(joint_values[i])
+                self.publisher_joint_values.publish(joints)
                 rospy.sleep(0.1)
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
