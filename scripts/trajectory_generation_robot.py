@@ -32,7 +32,7 @@ class ROSInvariantTrajectoryGeneration:
         self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
         
         # Create a ROS topic subscribers and publishers
-        rospy.Subscriber('/target_pose', Pose, self.callback_target_pose)
+        rospy.Subscriber('/target_pose_pub', Pose, self.callback_target_pose)
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
         self.publisher_traj_meas = rospy.Publisher('/target_pose_marker', Marker, queue_size=10)
         self.publisher_joint_values = rospy.Publisher('/joint_states', JointState, queue_size=10)
@@ -118,7 +118,7 @@ class ROSInvariantTrajectoryGeneration:
         }
 
         robot_params = {
-            "urdf_file_name": "ur10.urdf", # use None if do not want to include robot model
+            "urdf_file_name": None, # use None if do not want to include robot model
             "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values
             "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
             # "joint_number": 6, # Number of joints (if empty it is automatically taken from urdf file)
@@ -218,16 +218,17 @@ class ROSInvariantTrajectoryGeneration:
             self.publisher_traj_gen_marker.publish(marker)
 
             # Move robot
-            path_to_urdf = rw.find_robot_path(robot_params["urdf_file_name"])
-            robot = urdf.URDF.load(path_to_urdf)
-            joints = JointState()
-            joints.name = [robot._actuated_joints[i].name for i in range(robot.num_actuated_joints)]
-            for i in range(invariants.shape[0]):
-                joints.position = joint_values[i]
-                joints.header.stamp = rospy.Time.now()
-                # print(joint_values[i])
-                self.publisher_joint_values.publish(joints)
-                rospy.sleep(0.1)
+            if robot_params["urdf_file_name"] is not None:
+                path_to_urdf = rw.find_robot_path(robot_params["urdf_file_name"])
+                robot = urdf.URDF.load(path_to_urdf)
+                joints = JointState()
+                joints.name = [robot._actuated_joints[i].name for i in range(robot.num_actuated_joints)]
+                for i in range(invariants.shape[0]):
+                    joints.position = joint_values[i]
+                    joints.header.stamp = rospy.Time.now()
+                    # print(joint_values[i])
+                    self.publisher_joint_values.publish(joints)
+                    rospy.sleep(0.1)
 
             self.update_rate.sleep() # Sleep to maintain the specified update rate
 

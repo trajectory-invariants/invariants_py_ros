@@ -7,7 +7,7 @@ from tf.transformations import quaternion_from_euler
 class SimulateTargetPose:
     def __init__(self, radius, frequency):
         rospy.init_node('simulate_target_pose', anonymous=True)
-        self.pose_publisher = rospy.Publisher('/target_pose', Pose, queue_size=10)
+        self.pose_publisher = rospy.Publisher('/target_pose_pub', Pose, queue_size=10)
         self.radius = radius
         self.frequency = frequency
         self.pose = Pose()
