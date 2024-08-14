@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="etasl_vision_scene" >
+	<!-- robot -->
+	<!-- <xacro:include filename="$(find invariants_py_ros)/robot_description/urdf/ur10/robot_tools.urdf.xacro"/>   -->
+  <xacro:include filename="robot_tools.urdf.xacro"/>
+	<!-- environment -->
+	<xacro:include filename="../environment.urdf.xacro"/>  <!-- use to automatically find .xacro file-->
+	<!-- <xacro:include filename="$/home/richi/etasl/ws/my_new_workspace/src/invariants_py_ros/robot_description/urdf/environment.urdf.xacro"/> -->
+
+	<xacro:property name="pi" value="3.14159265" />
+	<xacro:property name="x_w" value="0"/>
+	<xacro:property name="y_w" value="0"/>
+	<xacro:property name="z_w" value="0"/>
+	<xacro:property name="roll_w" value="0.0"/>
+	<xacro:property name="pitch_w" value="0.0"/>
+	<xacro:property name="yaw_w" value="0.0"/>
+
+
+	<!-- combined scene -->
+	<link name="world"/>
+
+	<xacro:robot parent="world">
+		<origin xyz="${x_w} ${y_w} ${z_w}" rpy="${roll_w} ${pitch_w} ${yaw_w + pi}"/>
+	</xacro:robot>
+
+	<xacro:table name="table" parent="world" height="0.765">
+		<origin xyz="${x_w} ${y_w} ${z_w}" rpy="${roll_w} ${pitch_w} ${yaw_w}"/>
+	</xacro:table>
+
+</robot>

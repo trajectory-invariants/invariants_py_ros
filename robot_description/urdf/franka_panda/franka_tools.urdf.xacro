@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+       name="robot" >
+
+       <xacro:arg name="arm_id_1" default="panda"/>
+       <xacro:include filename="$(find franka_description)/robots/panda_arm.xacro"/>
+       <xacro:include filename="$(find franka_description)/robots/hand.xacro"/>
+
+<xacro:macro name="robot" params="parent *origin">
+  <!-- <joint name="robot_base_joint" type="fixed">
+    <insert_block name="origin" />
+    <parent link="${parent}"/>
+    <child link="base_link" />
+  </joint> -->
+
+  <xacro:panda_arm arm_id="$(arg arm_id_1)" connected_to="${parent}" xyz="0 0 0" safety_distance="0.03"/>
+  <xacro:hand ns="$(arg arm_id_1)" rpy="0 0 ${-pi/4}" connected_to="$(arg arm_id_1)_link8" safety_distance="0.03"/>
+
+  <!-- TCP -->
+  <joint name="TCP_joint" type="fixed">
+    <parent link="$(arg arm_id_1)_hand" />
+    <child link="TCP_frame" />
+    <!-- <origin xyz="0 0 0.112" rpy="0.0 0.0 0.0" /> -->
+    <!-- TCP in the middle of the fingers for grasping objects (minus 1 cm) -->
+    <origin xyz="0 0 ${0.112-0.01}" rpy="${pi} 0.0 0.0" />
+  </joint>
+
+  <link name="TCP_frame" >
+    <visual>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/opener.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="Red">
+        <color rgba="0.5 0 0 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://invariants_py_ros/robot_description/meshes/opener.stl" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+</xacro:macro>
+
+</robot>

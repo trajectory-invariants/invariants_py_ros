@@ -5,7 +5,7 @@
 import rospy
 import numpy as np
 from geometry_msgs.msg import Pose, PoseStamped
-import invariants_py.rockit_calculate_vector_invariants_position_mj as invariants_calculation
+import invariants_py.calculate_invariants.rockit_calculate_vector_invariants_position_mj as invariants_calculation
 import std_msgs.msg
 import helper_functions_ros
 from nav_msgs.msg import Path

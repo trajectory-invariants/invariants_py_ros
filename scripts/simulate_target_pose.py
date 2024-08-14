@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import rospy
 import numpy as np
 from geometry_msgs.msg import Pose
@@ -7,7 +7,7 @@ from tf.transformations import quaternion_from_euler
 class SimulateTargetPose:
     def __init__(self, radius, frequency):
         rospy.init_node('simulate_target_pose', anonymous=True)
-        self.pose_publisher = rospy.Publisher('/target_pose', Pose, queue_size=10)
+        self.pose_publisher = rospy.Publisher('/target_pose_pub', Pose, queue_size=10)
         self.radius = radius
         self.frequency = frequency
         self.pose = Pose()
@@ -20,9 +20,9 @@ class SimulateTargetPose:
 
             # Set the position of the target pose, following a circular motion
             angle = 2 * np.pi * self.frequency * (current_time - start_time)
-            self.pose.position.x = self.radius * np.cos(angle)
-            self.pose.position.y = self.radius * np.sin(angle)
-            self.pose.position.z = 1.0
+            self.pose.position.x = 0.9056+self.radius * np.cos(angle)
+            self.pose.position.y = 0.0635+self.radius * np.sin(angle)
+            self.pose.position.z = 0.441+0.1
 
             # Keep the orientation constant
             quaternion = quaternion_from_euler(0, 0, 0)
@@ -36,7 +36,7 @@ class SimulateTargetPose:
 
 if __name__ == '__main__':
     try:
-        simulator = SimulateTargetPose(radius=1.0, frequency=0.1)
+        simulator = SimulateTargetPose(radius=0, frequency=0.1)
         simulator.simulate_motion()
     except rospy.ROSInterruptException:
         pass
