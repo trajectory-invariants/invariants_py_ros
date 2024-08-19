@@ -27,12 +27,13 @@ from invariants_py.kinematics.orientation_kinematics import rot2quat
 from ros_spline_fitting_trajectory.msg import Trajectory
 
 class ROSInvariantTrajectoryGeneration:
-    def __init__(self, invariant_model_location,pos_location,R_location,FSt_location,FSr_location):
+    def __init__(self, invariant_model_location,pos_location,FSt_location,FSr_location):
         rospy.init_node('ros_trajectory_generation', anonymous=True)
         self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/target_pose_pub', Pose, self.callback_target_pose)
+        rospy.Subscriber('/start_traj_pub', Pose, self.callback_start_pose)
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
         self.publisher_traj_meas = rospy.Publisher('/target_pose_marker', Marker, queue_size=10)
         self.publisher_joint_values = rospy.Publisher('/joint_states', JointState, queue_size=10)
@@ -40,11 +41,14 @@ class ROSInvariantTrajectoryGeneration:
 
         # Initialize invariant trajectory generation problem
         self.invariant_model = rw.read_invariants_from_csv(invariant_model_location)
-        self.target_position = [1.1,0.0,0.0]
+        self.p_start = [0.0,0.0,0.0]
+        self.p_end = [1.1,0.0,0.0]
+        self.Robj_start = np.eye(3)
+        self.Robj_end = R.from_euler('z', 10, degrees=True).as_matrix()
 
-        self.p_obj = np.loadtxt(pos_location, delimiter=",")
-        loaded_Robj = np.loadtxt(R_location, delimiter=",")
-        self.Robj = loaded_Robj.reshape(loaded_Robj.shape[0], loaded_Robj.shape[1] // 3, 3)
+        self.demo_pos = np.loadtxt(pos_location, delimiter=",")
+        # loaded_Robj = np.loadtxt(R_location, delimiter=",")
+        # self.Robj = loaded_Robj.reshape(loaded_Robj.shape[0], loaded_Robj.shape[1] // 3, 3)
         loaded_FSt = np.loadtxt(FSt_location, delimiter=",")
         self.FSt = loaded_FSt.reshape(loaded_FSt.shape[0], loaded_FSt.shape[1] // 3, 3)
         loaded_FSr = np.loadtxt(FSr_location, delimiter=",")
@@ -52,7 +56,9 @@ class ROSInvariantTrajectoryGeneration:
 
     def callback_target_pose(self, pose_msg):
         # Callback function to process the received Pose message
-        self.target_position = [pose_msg.position.x, pose_msg.position.y, pose_msg.position.z]
+        self.p_end = [pose_msg.position.x, pose_msg.position.y, pose_msg.position.z]
+        self.quat_obj_end = [pose_msg.orientation.x, pose_msg.orientation.y, pose_msg.orientation.z, pose_msg.orientation.w]
+        self.Robj_end = R.from_quat(self.quat_obj_end).as_matrix()
         
         # Create a Marker message for the sphere
         marker = Marker()
@@ -76,6 +82,12 @@ class ROSInvariantTrajectoryGeneration:
         # Publish the Marker
         self.publisher_traj_meas.publish(marker)
 
+    def callback_start_pose(self, start_pose):
+        # Callback function to process the received Pose message
+        self.p_start = np.array([start_pose.position.x, start_pose.position.y, start_pose.position.z])
+        quat_obj_start = np.array([start_pose.orientation.x, start_pose.orientation.y, start_pose.orientation.z, start_pose.orientation.w])
+        self.Robj_start = R.from_quat(quat_obj_start).as_matrix()
+
     def run(self):
 
         current_progress = 0
@@ -87,23 +99,23 @@ class ROSInvariantTrajectoryGeneration:
         # new constraints       
         alpha = 0
         rotate = R.from_euler('z', alpha, degrees=True)
-        Robj_end =  orthonormalize(rotate.as_matrix() @ self.Robj[-1])
+        # Robj_end =  orthonormalize(rotate.as_matrix() @ self.Robj[-1])
         FSt_end = orthonormalize(rotate.as_matrix() @ self.FSt[-1])
 
         # # Linear initialization
-        R_obj_init = interpR(np.linspace(0, 1, len(self.Robj)), [0,1], np.array([self.Robj[0], Robj_end]))
+        R_obj_init = interpR(np.linspace(0, 1, len(self.demo_pos)), [0,1], np.array([self.Robj_start, self.Robj_end]))
         # # R_r_init = interpR(np.linspace(0, 1, len(optim_calc_results.FSr_frames)), [0,1], np.array([FSr_start, FSr_end]))
 
-        R_r_init, R_r_init_array, invars_init = FSr_init(self.Robj[0], Robj_end)
+        R_r_init, R_r_init_array, invars_init = FSr_init(self.Robj_start, self.Robj_end)
 
         boundary_constraints = {
             "position": {
-                "initial": self.p_obj[0], #np.array([0.3056, 0.0635, 0.441]), #
-                "final": np.array([0.69,0.244,0.4]) #self.p_obj[-1] #np.array([0.827,0.144,0.552]) 
+                "initial": self.p_start, #np.array([0.3056, 0.0635, 0.441]), #
+                "final": self.p_end #self.p_obj[-1] #np.array([0.827,0.144,0.552]) 
             },
             "orientation": {
-                "initial": orthonormalize(self.Robj[0]), #np.eye(3), #
-                "final": Robj_end #rotate_x(np.pi/16) #
+                "initial": self.Robj_start, #np.eye(3), #
+                "final": self.Robj_end #rotate_x(np.pi/16) #
             },
             "moving-frame": {
                 "translational": {
@@ -144,7 +156,7 @@ class ROSInvariantTrajectoryGeneration:
 
         initial_values = {
             "trajectory": {
-                "position": self.p_obj,
+                "position": self.demo_pos,
                 "orientation": R_obj_init
             },
             "moving-frame": {
@@ -170,8 +182,8 @@ class ROSInvariantTrajectoryGeneration:
         while not rospy.is_shutdown():
 
             # Specify the boundary constraints
-            boundary_constraints["position"]["initial"] = self.p_obj[0]# np.array([0.3056, 0.0635, 0.441]) #
-            boundary_constraints["position"]["final"] = self.target_position # self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #
+            boundary_constraints["position"]["initial"] = self.p_start# np.array([0.3056, 0.0635, 0.441]) #
+            boundary_constraints["position"]["final"] = self.p_end # self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #
             
 
             # Generate trajectory
@@ -238,11 +250,11 @@ if __name__ == '__main__':
         rospack = rospkg.RosPack()
         model_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_inv.csv"
         pos_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_pobj.csv"
-        R_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_Robj.csv"
+        # R_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_Robj.csv"
         FSt_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_FSt.csv"
         FSr_filename = rospack.get_path("invariants_py_ros")+"/data/"+"beer_FSr.csv"
         
-        ros_traj_gen_node = ROSInvariantTrajectoryGeneration(model_filename,pos_filename,R_filename,FSt_filename,FSr_filename)
+        ros_traj_gen_node = ROSInvariantTrajectoryGeneration(model_filename,pos_filename,FSt_filename,FSr_filename)
         
         # Run the loop of the node
         ros_traj_gen_node.run()

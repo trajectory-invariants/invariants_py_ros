@@ -25,11 +25,11 @@ class SimulateTargetPose:
             self.pose.position.z = 0.441+0.1
 
             # Keep the orientation constant
-            quaternion = quaternion_from_euler(0, 0, 0)
-            self.pose.orientation.x = quaternion[0]
-            self.pose.orientation.y = quaternion[1]
-            self.pose.orientation.z = quaternion[2]
-            self.pose.orientation.w = quaternion[3]
+            # quaternion = quaternion_from_euler(0, 0, 0)    
+            self.pose.orientation.x = -0.416769310582221 #quaternion[0]
+            self.pose.orientation.y = 0.034580327044172 #quaternion[1]
+            self.pose.orientation.z = -0.0419729444377253 #quaternion[2]
+            self.pose.orientation.w = 0.907384050264036 #quaternion[3]
             self.pose_publisher.publish(self.pose)
 
             rate.sleep() # Sleep for the time remaining to hit the 30 Hz update rate
