@@ -20,16 +20,16 @@ class SimulateTargetPose:
 
             # Set the position of the target pose, following a circular motion
             angle = 2 * np.pi * self.frequency * (current_time - start_time)
-            self.pose.position.x = 0.9056+self.radius * np.cos(angle)
-            self.pose.position.y = 0.0635+self.radius * np.sin(angle)
-            self.pose.position.z = 0.441+0.1
+            self.pose.position.x = 4.788147543322843758e-01 #0.9056+self.radius * np.cos(angle)
+            self.pose.position.y = -1.021277091361127431e-01 #0.0635+self.radius * np.sin(angle)
+            self.pose.position.z = 2.434438793779414023e-01 #0.441+0.1
 
             # Keep the orientation constant
             # quaternion = quaternion_from_euler(0, 0, 0)    
-            self.pose.orientation.x = -0.416769310582221 #quaternion[0]
-            self.pose.orientation.y = 0.034580327044172 #quaternion[1]
-            self.pose.orientation.z = -0.0419729444377253 #quaternion[2]
-            self.pose.orientation.w = 0.907384050264036 #quaternion[3]
+            self.pose.orientation.x = -8.155408847887090085e-01 #-0.416769310582221 #quaternion[0]
+            self.pose.orientation.y = -4.793533449288836512e-01 #0.034580327044172 #quaternion[1]
+            self.pose.orientation.z = 2.993281992424272064e-01 #-0.0419729444377253 #quaternion[2]
+            self.pose.orientation.w = -1.245634981919912510e-01 #0.907384050264036 #quaternion[3]
             self.pose_publisher.publish(self.pose)
 
             rate.sleep() # Sleep for the time remaining to hit the 30 Hz update rate
