@@ -120,12 +120,12 @@ class ROSInvariantTrajectoryGeneration:
 
             boundary_constraints = {
                 "position": {
-                    "initial": self.demo_pos[0], #self.p_start, #np.array([0.3056, 0.0635, 0.441]), #
-                    "final": self.demo_pos[-1] #self.p_end #self.p_obj[-1] #np.array([0.827,0.144,0.552]) 
+                    "initial": self.p_start, #self.demo_pos[0], #np.array([0.3056, 0.0635, 0.441]), #
+                    "final": self.p_end # self.demo_pos[-1] #self.p_obj[-1] #np.array([0.827,0.144,0.552]) 
                 },
                 "orientation": {
-                    "initial": self.demo_Robj[0], #self.Robj_start, #np.eye(3), #
-                    "final": self.demo_Robj[-1] #self.Robj_end #rotate_x(np.pi/16) #
+                    "initial": self.demo_Robj[0], #self.Robj_start, # np.eye(3), # # THIS NEEDS TO BE TAKEN FROM THE DEMO BECAUSE THE STARTING ORIENTATION OF TCP IS NOT THE SAME AS DEMO
+                    "final": self.Robj_end # self.demo_Robj[-1] #rotate_x(np.pi/16) #
                 },
                 "moving-frame": {
                     "translational": {
@@ -168,7 +168,7 @@ class ROSInvariantTrajectoryGeneration:
             initial_values = {
                 "trajectory": {
                     "position": self.demo_pos,
-                    "orientation": R_obj_init
+                    "orientation": self.demo_Robj
                 },
                 "moving-frame": {
                     "translational": self.FSt,
@@ -193,8 +193,8 @@ class ROSInvariantTrajectoryGeneration:
             while not rospy.is_shutdown():
 
                 # Specify the boundary constraints
-                boundary_constraints["position"]["initial"] = self.demo_pos[0] #self.p_start# np.array([0.3056, 0.0635, 0.441]) #
-                boundary_constraints["position"]["final"] = self.demo_pos[-1] #self.p_end # self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #
+                boundary_constraints["position"]["initial"] = self.p_start # self.demo_pos[0] # np.array([0.3056, 0.0635, 0.441]) #
+                boundary_constraints["position"]["final"] = self.p_end # self.demo_pos[-1] #self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #
                 
 
                 # Generate trajectory
