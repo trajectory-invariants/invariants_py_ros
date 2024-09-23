@@ -210,7 +210,14 @@ class ROSInvariantTrajectoryGeneration:
                 if np.linalg.norm(np.array(self.p_end) - np.array(self.previous_target)) > 1E-6:
 
                     self.previous_target = self.p_end
-
+                    
+                    # Resample model invariants to desired number of number_samples samples
+                    current_sample = round(self.current_progress*len(self.invariant_model))
+                    arclength_n = np.linspace(0,1,number_samples)
+                    spline_invariant_model = sh.create_spline_model(self.invariant_model[:,0], self.invariant_model[:,1:])
+                    progress_values = np.linspace(self.current_progress,self.invariant_model[-1,0],number_samples)
+                    model_invariants,progress_step = sh.interpolate_invariants(spline_invariant_model, progress_values)
+                    
                     # Specify the boundary constraints
                     boundary_constraints["position"]["initial"] = self.p_start # self.demo_pos[0] # np.array([0.3056, 0.0635, 0.441]) #
                     boundary_constraints["position"]["final"] = self.p_end # self.demo_pos[-1] #self.p_obj[-1] # np.array([0.827,0.144,0.552]) #np.array([0.69,0.244,0.4]) #

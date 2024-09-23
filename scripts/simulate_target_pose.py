@@ -28,6 +28,9 @@ class SimulateTargetPose:
                 self.pose.position.x = 0.4788147543322843758 
                 self.pose.position.y = -0.1021277091361127431 
                 self.pose.position.z = 0.2434438793779414023 
+                # self.pose.position.x = 0.5288347543322843758 # JUST FOR TESTING 
+                # self.pose.position.y = -0.35021377091361127431
+                # self.pose.position.z = 0.2434338793779414023
 
             # Keep the orientation constant
             # quaternion = quaternion_from_euler(0, 0, 0)    
