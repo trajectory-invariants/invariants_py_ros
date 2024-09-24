@@ -33,7 +33,7 @@ class ROSInvariantTrajectoryGeneration:
         
         # Create a ROS topic subscribers and publishers
         rospy.Subscriber('/target_pose_pub', Pose, self.callback_target_pose)
-        rospy.Subscriber('/current_pose_pub', Pose, self.callback_start_pose)
+        rospy.Subscriber('/current_pose_pub', Pose, self.callback_robot_pose)
         rospy.Subscriber('/progress_partial', std_msgs.msg.Float64, self.callback_progress)
         rospy.Subscriber('/des_ee', std_msgs.msg.Float64MultiArray, self.callback_des_ee)
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
@@ -41,6 +41,7 @@ class ROSInvariantTrajectoryGeneration:
         self.publisher_joint_values = rospy.Publisher('/joint_states', JointState, queue_size=10)
         self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
         self.publisher_desee_marker = rospy.Publisher('/des_ee_marker', Marker, queue_size=10)
+        self.pub_tf_marker = rospy.Publisher('/tf_marker', Marker, queue_size=10)
 
         # Initialize invariant trajectory generation problem
         self.invariant_model = rw.read_invariants_from_csv(invariant_model_location)
@@ -90,11 +91,42 @@ class ROSInvariantTrajectoryGeneration:
         # Publish the Marker
         self.publisher_traj_meas.publish(marker)
 
-    def callback_start_pose(self, start_pose):
+    def callback_robot_pose(self, robot_pose):
         # Callback function to process the received Pose message
-        self.p_start = np.array([start_pose.position.x, start_pose.position.y, start_pose.position.z])
-        quat_obj_start = np.array([start_pose.orientation.x, start_pose.orientation.y, start_pose.orientation.z, start_pose.orientation.w])
+        self.p_start = np.array([robot_pose.position.x, robot_pose.position.y, robot_pose.position.z])
+        quat_obj_start = np.array([robot_pose.orientation.x, robot_pose.orientation.y, robot_pose.orientation.z, robot_pose.orientation.w])
         self.Robj_start = R.from_quat(quat_obj_start).as_matrix()
+
+        self.tf = self.p_start
+
+        marker_msg = Marker()
+        marker_msg.header.frame_id = "world"
+        marker_msg.header.stamp = rospy.Time.now()
+        marker_msg.type = marker_msg.CUBE
+        # marker_msg.action = marker_msg.ADD
+        marker_msg.lifetime = rospy.Duration(30)
+        marker_msg.id = self.counter
+        self.counter += 1
+        # marker scale
+        marker_msg.scale.x = 0.008
+        marker_msg.scale.y = 0.008
+        marker_msg.scale.z = 0.008
+        # marker color
+        marker_msg.color.a = 1.0
+        marker_msg.color.r = 1.0
+        marker_msg.color.g = 0.0
+        marker_msg.color.b = 0.0
+        # marker orientaiton
+        marker_msg.pose.orientation.x = 0.0
+        marker_msg.pose.orientation.y = 0.0
+        marker_msg.pose.orientation.z = 0.0
+        marker_msg.pose.orientation.w = 1.0
+        # add all the points to the marker message
+        marker_msg.pose.position.x = self.tf[0]
+        marker_msg.pose.position.y = self.tf[1]
+        marker_msg.pose.position.z = self.tf[2]
+        # add the marker to the publisher
+        self.pub_tf_marker.publish(marker_msg)
 
     def callback_progress(self, progress_msg):
         # Callback function to process the received Float64 message
@@ -103,6 +135,35 @@ class ROSInvariantTrajectoryGeneration:
     def callback_des_ee(self, des_ee_msg):
         # Callback function to process the received Float64MultiArray message
         self.des_ee = des_ee_msg.data
+
+        marker_msg = Marker()
+        marker_msg.header.frame_id = "world"
+        marker_msg.header.stamp = rospy.Time.now()
+        marker_msg.type = marker_msg.CUBE
+        # marker_msg.action = marker_msg.ADD
+        marker_msg.lifetime = rospy.Duration(30)
+        marker_msg.id = self.counter
+        self.counter += 1
+        # marker scale
+        marker_msg.scale.x = 0.008
+        marker_msg.scale.y = 0.008
+        marker_msg.scale.z = 0.008
+        # marker color
+        marker_msg.color.a = 1.0
+        marker_msg.color.r = 0.0
+        marker_msg.color.g = 0.0
+        marker_msg.color.b = 1.0
+        # marker orientaiton
+        marker_msg.pose.orientation.x = 0.0
+        marker_msg.pose.orientation.y = 0.0
+        marker_msg.pose.orientation.z = 0.0
+        marker_msg.pose.orientation.w = 1.0
+        # add all the points to the marker message
+        marker_msg.pose.position.x = self.des_ee[0]
+        marker_msg.pose.position.y = self.des_ee[1]
+        marker_msg.pose.position.z = self.des_ee[2]
+        # add the marker to the publisher
+        self.publisher_desee_marker.publish(marker_msg)
 
     def run(self):
         if self.p_end is None or self.Robj_end is None:
@@ -280,35 +341,6 @@ class ROSInvariantTrajectoryGeneration:
                             # print(joint_values[i])
                             self.publisher_joint_values.publish(joints)
                             rospy.sleep(0.1)
-
-                marker_msg = Marker()
-                marker_msg.header.frame_id = "world"
-                marker_msg.header.stamp = rospy.Time.now()
-                marker_msg.type = marker_msg.CUBE
-                # marker_msg.action = marker_msg.ADD
-                marker_msg.lifetime = rospy.Duration(30)
-                marker_msg.id = self.counter
-                self.counter += 1
-                # marker scale
-                marker_msg.scale.x = 0.008
-                marker_msg.scale.y = 0.008
-                marker_msg.scale.z = 0.008
-                # marker color
-                marker_msg.color.a = 1.0
-                marker_msg.color.r = 0.0
-                marker_msg.color.g = 0.0
-                marker_msg.color.b = 1.0
-                # marker orientaiton
-                marker_msg.pose.orientation.x = 0.0
-                marker_msg.pose.orientation.y = 0.0
-                marker_msg.pose.orientation.z = 0.0
-                marker_msg.pose.orientation.w = 1.0
-                # add all the points to the marker message
-                marker_msg.pose.position.x = self.des_ee[0]
-                marker_msg.pose.position.y = self.des_ee[1]
-                marker_msg.pose.position.z = self.des_ee[2]
-                # add the marker to the publisher
-                self.publisher_desee_marker.publish(marker_msg)
 
                 self.update_rate.sleep() # Sleep to maintain the specified update rate
 
