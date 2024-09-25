@@ -97,37 +97,39 @@ class ROSInvariantTrajectoryGeneration:
         self.p_start = np.array([robot_pose.position.x, robot_pose.position.y, robot_pose.position.z])
         quat_obj_start = np.array([robot_pose.orientation.x, robot_pose.orientation.y, robot_pose.orientation.z, robot_pose.orientation.w])
         self.Robj_start = R.from_quat(quat_obj_start).as_matrix()
+        
+        if not np.allclose(self.des_ee, [0.0, 0.0, 0.0], atol=1e-8):
 
-        self.tf = self.p_start
+            self.tf = self.p_start
 
-        marker_msg = Marker()
-        marker_msg.header.frame_id = "world"
-        marker_msg.header.stamp = rospy.Time.now()
-        marker_msg.type = marker_msg.CUBE
-        # marker_msg.action = marker_msg.ADD
-        marker_msg.lifetime = rospy.Duration(30)
-        marker_msg.id = self.counter
-        self.counter += 1
-        # marker scale
-        marker_msg.scale.x = 0.008
-        marker_msg.scale.y = 0.008
-        marker_msg.scale.z = 0.008
-        # marker color
-        marker_msg.color.a = 1.0
-        marker_msg.color.r = 0.0
-        marker_msg.color.g = 1.0
-        marker_msg.color.b = 0.0
-        # marker orientaiton
-        marker_msg.pose.orientation.x = 0.0
-        marker_msg.pose.orientation.y = 0.0
-        marker_msg.pose.orientation.z = 0.0
-        marker_msg.pose.orientation.w = 1.0
-        # add all the points to the marker message
-        marker_msg.pose.position.x = self.tf[0]
-        marker_msg.pose.position.y = self.tf[1]
-        marker_msg.pose.position.z = self.tf[2]
-        # add the marker to the publisher
-        self.pub_tf_marker.publish(marker_msg)
+            marker_msg = Marker()
+            marker_msg.header.frame_id = "world"
+            marker_msg.header.stamp = rospy.Time.now()
+            marker_msg.type = marker_msg.CUBE
+            # marker_msg.action = marker_msg.ADD
+            marker_msg.lifetime = rospy.Duration(30)
+            marker_msg.id = self.counter
+            self.counter += 1
+            # marker scale
+            marker_msg.scale.x = 0.008
+            marker_msg.scale.y = 0.008
+            marker_msg.scale.z = 0.008
+            # marker color
+            marker_msg.color.a = 1.0
+            marker_msg.color.r = 0.0
+            marker_msg.color.g = 1.0
+            marker_msg.color.b = 0.0
+            # marker orientaiton
+            marker_msg.pose.orientation.x = 0.0
+            marker_msg.pose.orientation.y = 0.0
+            marker_msg.pose.orientation.z = 0.0
+            marker_msg.pose.orientation.w = 1.0
+            # add all the points to the marker message
+            marker_msg.pose.position.x = self.tf[0]
+            marker_msg.pose.position.y = self.tf[1]
+            marker_msg.pose.position.z = self.tf[2]
+            # add the marker to the publisher
+            self.pub_tf_marker.publish(marker_msg)
 
     def callback_progress(self, progress_msg):
         # Callback function to process the received Float64 message
