@@ -31,17 +31,19 @@ class ROSInvariantTrajectoryGeneration:
         rospy.init_node('ros_trajectory_generation', anonymous=True)
         self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
         
+        self.counter = 0
+
         # Create a ROS topic subscribers and publishers
-        rospy.Subscriber('/target_pose_pub', Pose, self.callback_target_pose)
-        rospy.Subscriber('/current_pose_pub', Pose, self.callback_robot_pose)
-        rospy.Subscriber('/progress_partial', std_msgs.msg.Float64, self.callback_progress)
-        rospy.Subscriber('/des_ee', std_msgs.msg.Float64MultiArray, self.callback_des_ee)
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
         self.publisher_traj_meas = rospy.Publisher('/target_pose_marker', Marker, queue_size=10)
         self.publisher_joint_values = rospy.Publisher('/joint_states', JointState, queue_size=10)
         self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
         self.publisher_desee_marker = rospy.Publisher('/des_ee_marker', Marker, queue_size=10)
         self.pub_tf_marker = rospy.Publisher('/tf_marker', Marker, queue_size=10)
+        rospy.Subscriber('/target_pose_pub', Pose, self.callback_target_pose)
+        rospy.Subscriber('/current_pose_pub', Pose, self.callback_robot_pose)
+        rospy.Subscriber('/progress_partial', std_msgs.msg.Float64, self.callback_progress)
+        rospy.Subscriber('/des_ee', std_msgs.msg.Float64MultiArray, self.callback_des_ee)
 
         # Initialize invariant trajectory generation problem
         self.invariant_model = rw.read_invariants_from_csv(invariant_model_location)
@@ -61,12 +63,11 @@ class ROSInvariantTrajectoryGeneration:
         self.previous_target = [1000,1000,1000]
 
         self.des_ee = [0,0,0]
-        self.counter = 0
 
-    def callback_target_pose(self, pose_msg):
+    def callback_target_pose(self, target_pose):
         # Callback function to process the received Pose message
-        self.p_end = [pose_msg.position.x, pose_msg.position.y, pose_msg.position.z]
-        self.quat_obj_end = [pose_msg.orientation.x, pose_msg.orientation.y, pose_msg.orientation.z, pose_msg.orientation.w]
+        self.p_end = [target_pose.position.x, target_pose.position.y, target_pose.position.z]
+        self.quat_obj_end = [target_pose.orientation.x, target_pose.orientation.y, target_pose.orientation.z, target_pose.orientation.w]
         self.Robj_end = R.from_quat(self.quat_obj_end).as_matrix()
         
         # Create a Marker message for the sphere
@@ -85,9 +86,9 @@ class ROSInvariantTrajectoryGeneration:
         marker.color.g = 0.0
         marker.color.b = 1.0
         # Set marker position
-        marker.pose.position.x = pose_msg.position.x
-        marker.pose.position.y = pose_msg.position.y
-        marker.pose.position.z = pose_msg.position.z
+        marker.pose.position.x = target_pose.position.x
+        marker.pose.position.y = target_pose.position.y
+        marker.pose.position.z = target_pose.position.z
         # Publish the Marker
         self.publisher_traj_meas.publish(marker)
 
@@ -113,8 +114,8 @@ class ROSInvariantTrajectoryGeneration:
         marker_msg.scale.z = 0.008
         # marker color
         marker_msg.color.a = 1.0
-        marker_msg.color.r = 1.0
-        marker_msg.color.g = 0.0
+        marker_msg.color.r = 0.0
+        marker_msg.color.g = 1.0
         marker_msg.color.b = 0.0
         # marker orientaiton
         marker_msg.pose.orientation.x = 0.0
