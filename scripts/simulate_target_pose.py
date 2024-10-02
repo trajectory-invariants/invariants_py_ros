@@ -3,6 +3,7 @@ import rospy
 import numpy as np
 from geometry_msgs.msg import Pose
 from tf.transformations import quaternion_from_euler
+from pynput.keyboard import Key, Listener
 
 class SimulateTargetPose:
     def __init__(self, radius, frequency):
@@ -11,17 +12,32 @@ class SimulateTargetPose:
         self.radius = radius
         self.frequency = frequency
         self.pose = Pose()
+        self.enter_pressed = False
+
+    def on_press(self, key):
+        try:
+            if key == Key.enter: # '\r':  # Enter key
+                self.enter_pressed = True
+        except AttributeError:
+            pass
+
 
     def simulate_motion(self):
+        print("\nPress Enter to start moving the target position\n")
         rate = rospy.Rate(50)  # 30 Hz
         start_time = rospy.Time.now().to_sec()
+
+        listener = Listener(on_press=self.on_press)
+        listener.start()
+
         while not rospy.is_shutdown():
             current_time = rospy.Time.now().to_sec()
 
+
             # Set the position of the target pose, following a circular motion
             angle = 2 * np.pi * self.frequency * (current_time - start_time)
-            if current_time - start_time > 11: #13
-                if current_time - start_time < 13:
+            if self.enter_pressed:
+                if current_time - switch_time < 2:
                     self.pose.position.x += 0.001 #0.5288147543322843758 #0.9056+self.radius * np.cos(angle)
                     self.pose.position.y += -0.002 #-0.35021277091361127431 #0.0635+self.radius * np.sin(angle)
                     self.pose.position.z += -0.001#0.2434438793779414023 #0.441+0.1
@@ -32,6 +48,7 @@ class SimulateTargetPose:
                 # self.pose.position.x = 0.5288347543322843758 # JUST FOR TESTING 
                 # self.pose.position.y = -0.35021377091361127431
                 # self.pose.position.z = 0.2434338793779414023
+                switch_time = rospy.Time.now().to_sec()
 
             # Keep the orientation constant
             # quaternion = quaternion_from_euler(0, 0, 0)    
