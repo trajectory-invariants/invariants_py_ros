@@ -32,6 +32,8 @@ class ROSInvariantTrajectoryGeneration:
         self.update_rate = rospy.Rate(20)  # Set the ROS node update rate (Default: 20 Hz)
         
         self.counter = 0
+        self.des_ee = [0,0,0]
+        self.first_traj = 1
 
         # Create a ROS topic subscribers and publishers
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
@@ -51,6 +53,7 @@ class ROSInvariantTrajectoryGeneration:
         self.p_end = None
         self.Robj_start = None
         self.Robj_end = None
+        self.current_progress = None
 
         self.demo_pos = np.loadtxt(pos_location, delimiter=",")
         loaded_Robj = np.loadtxt(R_location, delimiter=",")
@@ -62,7 +65,6 @@ class ROSInvariantTrajectoryGeneration:
 
         self.previous_target = [1000,1000,1000]
 
-        self.des_ee = [0,0,0]
 
     def callback_target_pose(self, target_pose):
         # Callback function to process the received Pose message
@@ -175,9 +177,10 @@ class ROSInvariantTrajectoryGeneration:
         if self.p_start is None or self.Robj_start is None:
             print("Waiting for a start pose to be published on /current_pose_pub topic...")
             rospy.wait_for_message('/current_pose_pub', Pose)
+            rospy.wait_for_message('/progress_partial',std_msgs.msg.Float64)
         # self.p_start = np.array([-2.622134222757627892e-02, -4.767094578195006371e-01, 0.08945761571123636569])
         # self.Robj_start = R.from_quat(np.array([-7.111921398743396017e-01,-8.563669717168140294e-03,-7.027414404159517680e-01,-1.693728620663667583e-02])).as_matrix()
-        if self.Robj_start is not None and self.Robj_end is not None and self.p_start is not None and self.p_end is not None:
+        if self.Robj_start is not None and self.Robj_end is not None and self.p_start is not None and self.p_end is not None and self.current_progress is not None:
             
             # current_progress = 0.6 # TAKE THIS FROM ETASLCORE
             number_samples = 100
@@ -269,6 +272,9 @@ class ROSInvariantTrajectoryGeneration:
             marker.color.r = 1.0
 
             while not rospy.is_shutdown():
+                
+                # if self.first_traj == 0:
+                #     self.current_progress += 0.2
 
                 # Generate a new trajectory only if the target has changed
                 if np.linalg.norm(np.array(self.p_end) - np.array(self.previous_target)) > 1E-6:
@@ -344,6 +350,8 @@ class ROSInvariantTrajectoryGeneration:
                             # print(joint_values[i])
                             self.publisher_joint_values.publish(joints)
                             rospy.sleep(0.1)
+
+                    self.first_traj = 0
 
                 self.update_rate.sleep() # Sleep to maintain the specified update rate
 
