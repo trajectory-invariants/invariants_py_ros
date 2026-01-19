@@ -20,7 +20,7 @@ from invariants_py.kinematics.rigidbody_kinematics import orthonormalize_rotatio
 import matplotlib.pyplot as plt
 import invariants_py.plotting_functions.plotters as pl
 from scipy.spatial.transform import Rotation as R
-from invariants_py.initialization import initial_trajectory_movingframe_rotation as FSr_init
+from invariants_py.ocp_initialization import initial_trajectory_movingframe_rotation as FSr_init
 from invariants_py.reparameterization import interpR
 import yourdfpy as urdf
 from invariants_py.kinematics.orientation_kinematics import rot2quat
