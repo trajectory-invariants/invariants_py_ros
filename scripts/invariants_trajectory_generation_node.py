@@ -105,9 +105,9 @@ class invariants_traj_gen_node:
             print("Waiting for a target pose to be published on /target_pose_pub topic...")
             rospy.wait_for_message('/target_pose_pub', Pose)
         if self.tf is None:
-            print("Waiting for a start pose to be published on /current_pose_pub topic...")
-            rospy.wait_for_message('/current_pose_pub', Pose)
-            rospy.wait_for_message('/progress_partial',std_msgs.msg.Float64)
+            print("Waiting for a start pose to be published on /pose_w_tcp topic...")
+            rospy.wait_for_message('/pose_w_tcp', Pose)
+            # rospy.wait_for_message('/progress_partial',std_msgs.msg.Float64)
            
         self.number_samples = 100
 
