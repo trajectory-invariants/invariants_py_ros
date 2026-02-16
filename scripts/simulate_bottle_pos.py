@@ -11,16 +11,16 @@ class SimulateBottlePos:
         self.tf = np.zeros(7)
         self.discrete_moving_tgt = True
         # self.switching_time = 3 # for discrete moving
-        self.switching_progress = 0.33 # for discrete moving
+        self.switching_progress = 1.33 # for discrete moving
         # self.switching_time = 10 # for continuous moving
-        # FOR BOTTLE APPROACH
-        self.pos_w_home = np.array([0.294492,0.068941,0.483837])
-        self.initial_bottle_position = np.array([0.4,0.1,-0.074])
-        self.moved_bottle_position = np.array([0.45,-0.15,-0.074])
+        # # FOR BOTTLE APPROACH
+        # self.pos_w_home = np.array([0.294492,0.068941,0.483837])
+        # self.initial_bottle_position = np.array([0.4,0.1,-0.074])
+        # self.moved_bottle_position = np.array([0.45,-0.15,-0.074])
         # FOR CRATE FILLING
-        # self.pos_w_home = np.array([0.25798,-0.0016,0.2561])
-        # self.initial_bottle_position = np.array([0.3,0,0.015]) # MB2
-        # self.moved_bottle_position = np.array([0.3,-0.21,0.015]) # LC2
+        self.pos_w_home = np.array([0.25798,-0.0016,0.2561])
+        self.initial_bottle_position = np.array([0.3,0,0.015]) # MB2
+        self.moved_bottle_position = np.array([0.3,-0.21,0.015]) # LC2
         # np.array([0.21,-0.39,0.015]) # LA1
         # np.array([0.21,-0.3,0.015]) # LB1
         # np.array([0.21,-0.21,0.015]) # LC1

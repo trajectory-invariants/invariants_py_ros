@@ -101,7 +101,6 @@ class invariants_traj_gen_node:
         self.pub_node_output = rospy.Publisher('/inv_gen_node_output', Float64MultiArray, queue_size=10, latch=True)
         self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
-        self.pub_bottle_markers = rospy.Publisher('/bottle_marker', Marker, queue_size=10)
 
            
         self.number_samples = 100
@@ -155,11 +154,11 @@ class invariants_traj_gen_node:
 
         # Define OCP weights
         self.weights_params = {
-            "w_invars": np.array([1, 1, 1, 5*10**1, 1.0, 1.0]),
-            "w_high_start": 60,
+            "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
+            "w_high_start": 70,
             "w_high_end": self.number_samples,
-            "w_high_invars": 10*np.array([1, 1, 1, 5*10**1, 1.0, 1.0]),
-            "w_high_active": 0
+            "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 5, 1, 1]),
+            "w_high_active": 1
         }
 
         self.initial_values = {
@@ -352,49 +351,9 @@ class invariants_traj_gen_node:
 
             # TODO Implement recovery strategy
             
-            outputs = np.hstack((self.progress_offset, self.enter_recovery_mode, self.alpha))
+            outputs = np.hstack((self.progress_offset, self.pose_w_tgt, self.enter_recovery_mode, self.alpha))
 
             self.pub_node_output.publish(Float64MultiArray(data=outputs))
-
-    def publish_bottle(self):
-        if all(i == 100 for i in self.bottle_pos_real):
-                self.bottle = self.bottle_pos_sim
-        else:
-                self.bottle = self.bottle_pos_real
-
-        # if not self.f_v[0] == 0 or not self.f_v_wrt_tgt[0] == 0 or not self.home[0] == 0:
-        if not all(i == 100 for i in self.bottle):
-            # create a marker message
-            marker_msg = Marker()
-            marker_msg.header.frame_id = "world"
-            marker_msg.header.stamp = rospy.Time.now()
-            marker_msg.type = marker_msg.MESH_RESOURCE
-            marker_msg.mesh_resource = "package://etasl_trajectory_tracking/robot_description/meshes/bottle.stl"
-            marker_msg.action = marker_msg.ADD
-            marker_msg.lifetime = rospy.Duration(10)
-            # marker scale
-            marker_msg.scale.x = 1
-            marker_msg.scale.y = 1
-            # FOR BOTTLE APPROACH
-            # marker_msg.scale.z = 1
-            # FOR CRATE FILLING
-            marker_msg.scale.z = 1.4
-            # marker color
-            marker_msg.color.a = 1.0
-            marker_msg.color.r = 1.0
-            marker_msg.color.g = 1.0
-            marker_msg.color.b = 1.0
-            # marker orientaiton
-            marker_msg.pose.orientation.x = 0.0
-            marker_msg.pose.orientation.y = 0.0
-            marker_msg.pose.orientation.z = 0.0
-            marker_msg.pose.orientation.w = 1.0
-            # marker position
-            marker_msg.pose.position.x = self.bottle[0]
-            marker_msg.pose.position.y = self.bottle[1]
-            marker_msg.pose.position.z = self.bottle[2]
-            # add the marker to the publisher
-            self.pub_bottle_markers.publish(marker_msg)
 
 if __name__ == '__main__':
 
@@ -403,7 +362,6 @@ if __name__ == '__main__':
     # This defines the rate at which the node should publish
     rate = rospy.Rate(10) # 10hz
     while not rospy.is_shutdown():
-        inv_node.publish_bottle()
         inv_node.check_condition()
         inv_node.generate_trajectory()
         rate.sleep()
