@@ -11,7 +11,7 @@ class SimulateBottlePos:
         self.tf = np.zeros(7)
         self.discrete_moving_tgt = True
         # self.switching_time = 3 # for discrete moving
-        self.switching_progress = 1.33 # for discrete moving
+        self.switching_progress = 0.33 # for discrete moving
         # self.switching_time = 10 # for continuous moving
         # # FOR BOTTLE APPROACH
         # self.pos_w_home = np.array([0.294492,0.068941,0.483837])

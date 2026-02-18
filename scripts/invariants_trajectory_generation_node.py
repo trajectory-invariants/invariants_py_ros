@@ -33,15 +33,12 @@ class invariants_traj_gen_node:
         self.progress_fv = 0
         self.progress_offset_previous = 0
         self.progress_sum = 0
-        self.progress_rot = 0
         self.progress_offset = 0
-        self.cond = 1000
         self.counter = 0
         self.condition = 0
         self.dist_ratio = 1
         self.enter_recovery_mode = 0
         self.recovery_target = 100 * np.ones(7)
-        self.R = np.eye(3)
         self.current_sample = 0
         self.factor_execution_speed = 1
         self.jointvel = np.zeros(7)
@@ -53,6 +50,9 @@ class invariants_traj_gen_node:
         self.radius = 0.0145 + 0.015 # radius of the bottle (stella :0.0145, FM: 0.021) + buffer of 0.015
         self.alpha = np.array([np.pi/2]) # angle of approach direction around z-axis in rad
         self.pos_w_traj = 100*np.ones((100,3))
+        self.home = np.zeros(3)
+        self.invariants_traj = np.zeros((100,3)) 
+        self.R_w_traj = np.ones((100,3,3))*np.eye(3)
 
         rospack = rospkg.RosPack()
         #%% User input
@@ -96,9 +96,10 @@ class invariants_traj_gen_node:
         rospy.Subscriber('progress', Float64MultiArray, self.callback_progress) # I need some kind of progress, representing the progress of the robot along the trajectory
         rospy.Subscriber('progress_fv', Float64MultiArray, self.callback_progress_fv) # This should be the value of the progress feature variable
         rospy.Subscriber('progress_offset_previous', Float64MultiArray, self.callback_progress_offset_previous) # It's the progress offset of the previous sample
-        rospy.Subscriber('condition_output', Float64MultiArray, self.callback_cond)
         rospy.Subscriber('factor_execution_speed', Float64MultiArray, self.callback_factorexecspeed)
-        self.pub_node_output = rospy.Publisher('/inv_gen_node_output', Float64MultiArray, queue_size=10, latch=True)
+        rospy.Subscriber('jointvel', Float64MultiArray, self.callback_jointvel)
+        rospy.Subscriber('home_position', Float64MultiArray, self.callback_home)
+        self.pub_node_output = rospy.Publisher('/raw_inv_gen_node_output', Float64MultiArray, queue_size=10, latch=True)
         self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
 
@@ -217,10 +218,6 @@ class invariants_traj_gen_node:
     def callback_tf(self,data):
 
         self.tf = data.data
-    
-    def callback_cond(self,data):
-
-        self.cond = data.data[0]
 
     def callback_jointvel(self,data):
 
@@ -229,6 +226,10 @@ class invariants_traj_gen_node:
     def callback_factorexecspeed(self,data):
 
         self.factor_execution_speed = data.data[0]
+
+    def callback_home(self,data):
+
+        self.home = data.data
 
     def check_condition(self):
         # This function checks that the robot position is not more than 0.01 m away from the model trajectory evaluated at the progress given by etasl.
@@ -256,7 +257,7 @@ class invariants_traj_gen_node:
 
             # Check if the robot position is within 0.01 m of the model trajectory
             dist_robot_to_model = np.array([np.linalg.norm(self.tf[:3] - self.pos_w_traj[i,:]) for i in range(self.number_samples)])
-            if any(dist_robot_to_model  < 0.01): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
+            if any(dist_robot_to_model  < 0.01) and all(np.isclose(self.pos_w_bottle,self.pos_w_traj[-1,:],0,0.002)): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
                 self.condition = 1
                 self.current_sample = np.argmin(dist_robot_to_model)
             else:
@@ -266,8 +267,8 @@ class invariants_traj_gen_node:
         if not self.tf[0] == 0:# and self.condition == 0:
 
             # Predict the robot pose in 100ms (ros node rate) by taking the model pose in a few delay_sample
-            delay_sample = 2+int(self.factor_execution_speed/2)# int(2*self.factor_execution_speed) # (-self.enter_recovery_mode+1) # (-2*self.enter_recovery_mode+1) * 
-            if all(self.jointvel[i] < 1e-4 for i in range(6)) or self.enter_recovery_mode == 1:
+            delay_sample = 3#2+int(self.factor_execution_speed/2)# int(2*self.factor_execution_speed) # (-self.enter_recovery_mode+1) # (-2*self.enter_recovery_mode+1) * 
+            if all(self.jointvel[i] < 1e-6 for i in range(6)) or self.enter_recovery_mode == 1:
                 pos_w_tcp = np.array([self.tf[0],self.tf[1],self.tf[2]])
             else:
                 if self.current_sample+ delay_sample>= len(self.previous_model_trajectory):
@@ -275,11 +276,10 @@ class invariants_traj_gen_node:
                 else:
                     pos_w_tcp = self.previous_model_trajectory[self.current_sample+delay_sample]
             R_w_tcp = quat2rot(np.hstack([self.tf[3], self.tf[4], self.tf[5],self.tf[6]]).reshape(1,4)).reshape(3,3)
-
             if self.counter == 0:
                 self.previous_target = self.pos_w_tgt
             prev_dist_to_target = np.linalg.norm(self.previous_target - pos_w_tcp)
-            if self.condition == 0:
+            if self.condition == 0 and not self.home[0] == 0:
                 # Calculate s_prior by comparing the distance of the current robot pose to the previous target and to the current target
                 dist_to_target = np.linalg.norm(self.pos_w_tgt - pos_w_tcp)
                 self.progress_sum = self.progress_fv + self.progress_offset_previous
@@ -317,33 +317,33 @@ class invariants_traj_gen_node:
                 
                 self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
 
-            # Publish trajectory
-            trajectory = Trajectory()
-            quaternion = rot2quat(self.R_w_traj)
-            for i in range(self.invariants_traj.shape[0]):
-                pose = Pose()
-                pose.position.x = self.pos_w_traj[i,0]
-                pose.position.y = self.pos_w_traj[i,1]
-                pose.position.z = self.pos_w_traj[i,2]
-                pose.orientation.x = quaternion[i,0]
-                pose.orientation.y = quaternion[i,1]
-                pose.orientation.z = quaternion[i,2]
-                pose.orientation.w = quaternion[i,3]
-                trajectory.poses.append(pose)
-            self.publisher_trajectory.publish(trajectory)
+                # Publish trajectory
+                trajectory = Trajectory()
+                quaternion = rot2quat(self.R_w_traj)
+                for i in range(self.invariants_traj.shape[0]):
+                    pose = Pose()
+                    pose.position.x = self.pos_w_traj[i,0]
+                    pose.position.y = self.pos_w_traj[i,1]
+                    pose.position.z = self.pos_w_traj[i,2]
+                    pose.orientation.x = quaternion[i,0]
+                    pose.orientation.y = quaternion[i,1]
+                    pose.orientation.z = quaternion[i,2]
+                    pose.orientation.w = quaternion[i,3]
+                    trajectory.poses.append(pose)
+                self.publisher_trajectory.publish(trajectory)
 
-            # Add points to the marker
-            self.marker.points = []
-            for point in self.pos_w_traj:  # Assuming traj is a numpy array of shape (self.number_samples, 3)
-                p = Point()
-                p.x = point[0]
-                p.y = point[1]
-                p.z = point[2]
-                self.marker.points.append(p)
+                # Add points to the marker
+                self.marker.points = []
+                for point in self.pos_w_traj:  # Assuming traj is a numpy array of shape (self.number_samples, 3)
+                    p = Point()
+                    p.x = point[0]
+                    p.y = point[1]
+                    p.z = point[2]
+                    self.marker.points.append(p)
 
-            # Publish the Marker
-            self.marker.header.stamp = rospy.Time.now() # add timestamp
-            self.publisher_traj_gen_marker.publish(self.marker)
+                # Publish the Marker
+                self.marker.header.stamp = rospy.Time.now() # add timestamp
+                self.publisher_traj_gen_marker.publish(self.marker)
 
             self.counter += 1
 
