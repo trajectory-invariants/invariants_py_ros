@@ -139,14 +139,14 @@ class invariants_traj_gen_node:
             },
         }
 
-        robot_params = {
+        self.robot_params = {
             "urdf_file_name": None, # use None if do not want to include robot model
             "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values
             "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
         }
         # Franka q_init: [-0.03594372660758203, -1.7589981400814376, -1.9254516473826875, -1.9436872720551073, -0.3177960551049983, 1.981110099809029,-1.0311961190588514]
         
-        self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=robot_params)
+        self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params)
         
         # Resample model invariants to desired number of self.number_samples samples
         spline_invariant_model = sh.create_spline_model(self.invariant_model[:,0], self.invariant_model[:,1:])
@@ -172,7 +172,7 @@ class invariants_traj_gen_node:
                 "rotational": R_r_init_array
             },
             "invariants": model_invariants,
-            "joint-values": robot_params["q_init"] if robot_params["urdf_file_name"] is not None else {}
+            "joint-values": self.robot_params["q_init"] if self.robot_params["urdf_file_name"] is not None else {}
         }
 
         # Create the Marker message
@@ -257,24 +257,28 @@ class invariants_traj_gen_node:
 
             # Check if the robot position is within 0.01 m of the model trajectory
             dist_robot_to_model = np.array([np.linalg.norm(self.tf[:3] - self.pos_w_traj[i,:]) for i in range(self.number_samples)])
-            if any(dist_robot_to_model  < 0.01) and all(np.isclose(self.pos_w_bottle,self.pos_w_traj[-1,:],0,0.002)): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
+            # print("MIN", min(dist_robot_to_model))
+            if any(dist_robot_to_model  < 0.02) and all(np.isclose(self.pos_w_bottle,self.pos_w_traj[-1,:],0,0.002)): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
                 self.condition = 1
-                self.current_sample = np.argmin(dist_robot_to_model)
             else:
                 self.condition = 0
+                # print(self.pos_w_bottle,self.pos_w_traj[-1,:])
+                # print("DIIIIST", dist_robot_to_model)
+            self.current_sample = np.argmin(dist_robot_to_model)
 
     def generate_trajectory(self):
         if not self.tf[0] == 0:# and self.condition == 0:
 
             # Predict the robot pose in 100ms (ros node rate) by taking the model pose in a few delay_sample
-            delay_sample = 3#2+int(self.factor_execution_speed/2)# int(2*self.factor_execution_speed) # (-self.enter_recovery_mode+1) # (-2*self.enter_recovery_mode+1) * 
+            delay_sample = 5#2+int(self.factor_execution_speed/2)# int(2*self.factor_execution_speed) # (-self.enter_recovery_mode+1) # (-2*self.enter_recovery_mode+1) * 
             if all(self.jointvel[i] < 1e-6 for i in range(6)) or self.enter_recovery_mode == 1:
                 pos_w_tcp = np.array([self.tf[0],self.tf[1],self.tf[2]])
             else:
                 if self.current_sample+ delay_sample>= len(self.previous_model_trajectory):
                     pos_w_tcp = self.previous_model_trajectory[self.current_sample]
                 else:
-                    pos_w_tcp = self.previous_model_trajectory[self.current_sample+delay_sample]
+                    pos_w_tcp = self.pos_w_traj[self.current_sample+delay_sample]
+                    # print("AAAAAAAAAAAAAAAA", pos_w_tcp, self.current_sample+delay_sample, self.condition)
             R_w_tcp = quat2rot(np.hstack([self.tf[3], self.tf[4], self.tf[5],self.tf[6]]).reshape(1,4)).reshape(3,3)
             if self.counter == 0:
                 self.previous_target = self.pos_w_tgt
@@ -307,14 +311,19 @@ class invariants_traj_gen_node:
                 self.boundary_constraints["position"]["final"] = self.pos_w_tgt
                 self.boundary_constraints["orientation"]["initial"] = R_w_tcp
                 self.boundary_constraints["orientation"]["final"] = R_w_tgt # Start simple, where R_w_tgt is constant and equal to demo_Robj (for cf), TODO add variability in orientation!
-                self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[current_sample])
+                if self.counter == 0:
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[current_sample+delay_sample])
+                else:
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[current_sample+delay_sample])
                 self.boundary_constraints["moving-frame"]["translational"]["final"] = FSt_end
                 self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[current_sample])
                 self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
 
+                # print(pos_w_tcp,self.tf[:3],self.pos_w_tgt,self.current_sample+delay_sample,self.progress)
+
                 # Generate trajectory
                 self.invariants_traj, self.pos_w_traj, self.R_w_traj, self.FSt_w_traj, self.FSr_w_traj, joint_values = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values)
-                
+                # print(self.pos_w_traj)
                 self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
 
                 # Publish trajectory
@@ -345,7 +354,13 @@ class invariants_traj_gen_node:
                 self.marker.header.stamp = rospy.Time.now() # add timestamp
                 self.publisher_traj_gen_marker.publish(self.marker)
 
-            self.counter += 1
+                self.counter += 1
+
+            else:
+                if self.home[0] == 0 and self.counter > 0:
+                    self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params)
+                    self.counter = 0
+
 
             self.previous_target = self.pos_w_tgt
 
