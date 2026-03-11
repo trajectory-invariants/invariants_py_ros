@@ -20,6 +20,7 @@ import invariants_py.spline_handler as sh
 from ros_spline_fitting_trajectory.msg import Trajectory
 import rospkg
 from invariants_py import data_handler as dh
+import matplotlib.pyplot as plt
 
 class invariants_traj_gen_node:
 
@@ -285,7 +286,7 @@ class invariants_traj_gen_node:
                 self.previous_target = self.pos_w_tgt
             prev_dist_to_target = np.linalg.norm(self.previous_target - pos_w_tcp)
             if self.condition == 0 and not self.home[0] == 0:
-                # print("DDDDDDDDDDDDDDDDDDDDDDDD", self.invariants_traj[self.current_sample,3],np.rad2deg(np.arccos(np.dot(np.linalg.norm(self.pos_w_traj[-1,:]-np.array(self.tf[:3])),np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3])))/(np.linalg.norm(self.pos_w_traj[-1,:]-np.array(self.tf[:3]))*np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3]))))), self.pos_w_traj[-1,:], self.pos_w_tgt)
+                # print("DDDDDDDDDDDDDDDDDDDDDDDD", self.invariants_traj[self.current_sample,3],np.rad2deg(np.arccos(np.dot(self.pos_w_traj[-1,:]-np.array(self.tf[:3]),self.pos_w_tgt-np.array(self.tf[:3]))/(np.linalg.norm(self.pos_w_traj[-1,:]-np.array(self.tf[:3]))*np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3]))))), self.pos_w_traj[-1,:], self.pos_w_tgt)
                 # Calculate s_prior by comparing the distance of the current robot pose to the previous target and to the current target
                 dist_to_target = np.linalg.norm(self.pos_w_tgt - pos_w_tcp)
                 self.progress_sum = self.progress_fv + self.progress_offset_previous
@@ -327,8 +328,8 @@ class invariants_traj_gen_node:
                 # print(pos_w_tcp,self.tf[:3],self.pos_w_tgt,self.current_sample+delay_sample,self.progress)
 
                 # Generate trajectory
-                self.invariants_traj, self.pos_w_traj, self.R_w_traj, self.FSt_w_traj, self.FSr_w_traj, joint_values = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values)
-                # print(self.pos_w_traj)
+                self.invariants_traj, self.pos_w_traj, self.R_w_traj, self.FSt_w_traj, self.FSr_w_traj, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True)
+                print(inv_err)
                 self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
 
                 # Publish trajectory
@@ -349,6 +350,46 @@ class invariants_traj_gen_node:
                 else:
                     print("NOT PUBLISHING, ERROR VALUE:", np.linalg.norm(self.pos_w_tgt - pos_w_tcp))
 
+                # arclength_n = np.linspace(0,self.invariant_model[-1,0],99)
+                # if self.counter == 1:
+                #     fig = plt.figure()
+                #     plt.subplot(2,3,1)
+                #     plt.plot(arclength_n,self.invariant_model[:,1],'b')
+                #     plt.plot(progress_values,self.invariants_traj[:,0],'r')
+                #     plt.plot(0,0)
+                #     plt.title('i_r1')
+
+                #     plt.subplot(2,3,2)
+                #     plt.plot(arclength_n,self.invariant_model[:,2],'b')
+                #     plt.plot(progress_values,self.invariants_traj[:,1],'r')
+                #     plt.plot(0,0)
+                #     plt.title('i_r2')
+
+                #     plt.subplot(2,3,3)
+                #     plt.plot(arclength_n,self.invariant_model[:,3],'b')
+                #     plt.plot(progress_values,self.invariants_traj[:,2],'r')
+                #     plt.plot(0,0)
+                #     plt.title('i_r3')
+
+                #     plt.subplot(2,3,4)
+                #     plt.plot(arclength_n,self.invariant_model[:,4],'b')
+                #     plt.plot(progress_values,self.invariants_traj[:,3],'r')
+                #     plt.plot(0,0)
+                #     plt.title('i_t1')
+
+                #     plt.subplot(2,3,5)
+                #     plt.plot(arclength_n,self.invariant_model[:,5],'b')
+                #     plt.plot(progress_values,self.invariants_traj[:,4],'r')
+                #     plt.plot(0,0)
+                #     plt.title('i_t2')
+
+                #     plt.subplot(2,3,6)
+                #     plt.plot(arclength_n,self.invariant_model[:,6],'b')
+                #     plt.plot(progress_values,self.invariants_traj[:,5],'r')
+                #     plt.plot(0,0)
+                #     plt.title('i_t3')
+
+                #     plt.show()
 
                 # Add points to the marker
                 self.marker.points = []
