@@ -51,7 +51,7 @@ class invariants_traj_gen_node:
         self.alpha = np.array([np.pi/2]) # angle of approach direction around z-axis in rad
         self.pos_w_traj = 100*np.ones((100,3))
         self.home = np.zeros(3)
-        self.invariants_traj = np.zeros((100,3)) 
+        self.invariants_traj = np.zeros((100,6)) 
         self.R_w_traj = np.ones((100,3,3))*np.eye(3)
 
         rospack = rospkg.RosPack()
@@ -104,7 +104,7 @@ class invariants_traj_gen_node:
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
 
            
-        self.number_samples = 100
+        self.number_samples = 50
 
         # new constraints       
         alpha = 0
@@ -113,9 +113,9 @@ class invariants_traj_gen_node:
         FSt_end = orthonormalize(rotate.as_matrix() @ self.demo_FSt[-1])
         
         # # Linear initialization
-        R_obj_init = interpR(np.linspace(0, 1, len(self.demo_pos)), [0,1], np.array([np.eye(3), R_w_tgt]))
+        R_obj_init = interpR(np.linspace(0, 1, self.number_samples), [0,1], np.array([np.eye(3), R_w_tgt]))
 
-        R_r_init, R_r_init_array, invars_init = FSr_init(np.eye(3), R_w_tgt)
+        R_r_init, R_r_init_array, invars_init = FSr_init(np.eye(3), R_w_tgt, N=self.number_samples)
         
         # Initialising the boundary constraints with zeros or I
         self.boundary_constraints = {
@@ -141,7 +141,8 @@ class invariants_traj_gen_node:
 
         self.robot_params = {
             "urdf_file_name": None, # use None if do not want to include robot model
-            "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values
+            # "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values
+            "q_init": np.array([-0.06999619209628122, -0.9936042374309739, 0.04052275688381114, -3.040355360901146, 0.024184582866498106, 2.0659148485780445, 0.7930461100688347]), # Initial joint values for Franka Panda
             "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
         }
         # Franka q_init: [-0.03594372660758203, -1.7589981400814376, -1.9254516473826875, -1.9436872720551073, -0.3177960551049983, 1.981110099809029,-1.0311961190588514]
@@ -164,11 +165,11 @@ class invariants_traj_gen_node:
 
         self.initial_values = {
             "trajectory": {
-                "position": self.demo_pos,
+                "position": np.array([np.interp(np.linspace(0,len(self.demo_pos)-1,num=self.number_samples),np.linspace(0,len(self.demo_pos)-1,num=len(self.demo_pos)),self.demo_pos[:,i]) for i in range(3)]).T, 
                 "orientation": R_obj_init
             },
             "moving-frame": {
-                "translational": self.demo_FSt,
+                "translational": interpR(np.linspace(0,1,self.number_samples),np.linspace(0,1,len(self.demo_pos)),self.demo_FSt),
                 "rotational": R_r_init_array
             },
             "invariants": model_invariants,
@@ -270,7 +271,7 @@ class invariants_traj_gen_node:
         if not self.tf[0] == 0:# and self.condition == 0:
 
             # Predict the robot pose in 100ms (ros node rate) by taking the model pose in a few delay_sample
-            delay_sample = 5#2+int(self.factor_execution_speed/2)# int(2*self.factor_execution_speed) # (-self.enter_recovery_mode+1) # (-2*self.enter_recovery_mode+1) * 
+            delay_sample = 1#2+int(self.factor_execution_speed/2)# int(2*self.factor_execution_speed) # (-self.enter_recovery_mode+1) # (-2*self.enter_recovery_mode+1) * 
             if all(self.jointvel[i] < 1e-6 for i in range(6)) or self.enter_recovery_mode == 1:
                 pos_w_tcp = np.array([self.tf[0],self.tf[1],self.tf[2]])
             else:
@@ -284,6 +285,7 @@ class invariants_traj_gen_node:
                 self.previous_target = self.pos_w_tgt
             prev_dist_to_target = np.linalg.norm(self.previous_target - pos_w_tcp)
             if self.condition == 0 and not self.home[0] == 0:
+                # print("DDDDDDDDDDDDDDDDDDDDDDDD", self.invariants_traj[self.current_sample,3],np.rad2deg(np.arccos(np.dot(np.linalg.norm(self.pos_w_traj[-1,:]-np.array(self.tf[:3])),np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3])))/(np.linalg.norm(self.pos_w_traj[-1,:]-np.array(self.tf[:3]))*np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3]))))), self.pos_w_traj[-1,:], self.pos_w_tgt)
                 # Calculate s_prior by comparing the distance of the current robot pose to the previous target and to the current target
                 dist_to_target = np.linalg.norm(self.pos_w_tgt - pos_w_tcp)
                 self.progress_sum = self.progress_fv + self.progress_offset_previous
@@ -301,7 +303,7 @@ class invariants_traj_gen_node:
                 FSt_end = orthonormalize(rotate.as_matrix() @ self.demo_FSt[-1])
                 
                 # Resample model invariants to desired number of self.number_samples samples
-                current_sample = round(self.progress*len(self.invariant_model))
+                # current_sample = round(self.progress*len(self.invariant_model))
                 spline_invariant_model = sh.create_spline_model(self.invariant_model[:,0], self.invariant_model[:,1:])
                 progress_values = np.linspace(self.progress,self.invariant_model[-1,0],self.number_samples)
                 model_invariants,progress_step = sh.interpolate_invariants(spline_invariant_model, progress_values)
@@ -312,12 +314,15 @@ class invariants_traj_gen_node:
                 self.boundary_constraints["orientation"]["initial"] = R_w_tcp
                 self.boundary_constraints["orientation"]["final"] = R_w_tgt # Start simple, where R_w_tgt is constant and equal to demo_Robj (for cf), TODO add variability in orientation!
                 if self.counter == 0:
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[current_sample+delay_sample])
+                    # print("BBBBBBBBBBBBBBBBBBBBBBBBBBB",int((self.current_sample+delay_sample)*100/self.number_samples), self.current_sample)
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[int((self.current_sample)*100/self.number_samples)])
                 else:
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[current_sample+delay_sample])
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[self.current_sample+delay_sample])
                 self.boundary_constraints["moving-frame"]["translational"]["final"] = FSt_end
-                self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[current_sample])
+                self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[int(self.current_sample*100/self.number_samples)])
                 self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
+
+                self.initial_values["trajectory"]["position"] += self.home
 
                 # print(pos_w_tcp,self.tf[:3],self.pos_w_tgt,self.current_sample+delay_sample,self.progress)
 
@@ -339,7 +344,11 @@ class invariants_traj_gen_node:
                     pose.orientation.z = quaternion[i,2]
                     pose.orientation.w = quaternion[i,3]
                     trajectory.poses.append(pose)
-                self.publisher_trajectory.publish(trajectory)
+                if np.linalg.norm(self.pos_w_tgt - self.pos_w_traj[-1]) < 0.01:
+                    self.publisher_trajectory.publish(trajectory)
+                else:
+                    print("NOT PUBLISHING, ERROR VALUE:", np.linalg.norm(self.pos_w_tgt - pos_w_tcp))
+
 
                 # Add points to the marker
                 self.marker.points = []
