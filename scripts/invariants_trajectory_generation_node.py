@@ -54,6 +54,7 @@ class invariants_traj_gen_node:
         self.home = np.zeros(3)
         self.invariants_traj = np.zeros((100,6)) 
         self.R_w_traj = np.ones((100,3,3))*np.eye(3)
+        self.trajectory = Trajectory()
 
         rospack = rospkg.RosPack()
         #%% User input
@@ -148,7 +149,12 @@ class invariants_traj_gen_node:
         }
         # Franka q_init: [-0.03594372660758203, -1.7589981400814376, -1.9254516473826875, -1.9436872720551073, -0.3177960551049983, 1.981110099809029,-1.0311961190588514]
         
-        self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params)
+        dummy = { "inv_sol": np.loadtxt(dh.find_data_path("dummy_sol.csv"),delimiter=","), 
+          "inv_demo": np.loadtxt(dh.find_data_path("dummy_inv.csv"),delimiter=","), 
+          "R_t": np.loadtxt(dh.find_data_path("dummy_R_t.csv"),delimiter=",").reshape(100,3,3), 
+          "R_r": np.loadtxt(dh.find_data_path("dummy_R_r.csv"),delimiter=",").reshape(100,3,3)}
+
+        self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params, dummy=dummy)
         
         # Resample model invariants to desired number of self.number_samples samples
         spline_invariant_model = sh.create_spline_model(self.invariant_model[:,0], self.invariant_model[:,1:])
@@ -158,7 +164,7 @@ class invariants_traj_gen_node:
         # Define OCP weights
         self.weights_params = {
             "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
-            "w_high_start": 70,
+            "w_high_start": round(0.7*self.number_samples),
             "w_high_end": self.number_samples,
             "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 5, 1, 1]),
             "w_high_active": 1
@@ -316,11 +322,11 @@ class invariants_traj_gen_node:
                 self.boundary_constraints["orientation"]["final"] = R_w_tgt # Start simple, where R_w_tgt is constant and equal to demo_Robj (for cf), TODO add variability in orientation!
                 if self.counter == 0:
                     # print("BBBBBBBBBBBBBBBBBBBBBBBBBBB",int((self.current_sample+delay_sample)*100/self.number_samples), self.current_sample)
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[int((self.current_sample)*100/self.number_samples)])
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[round((self.current_sample)*100/self.number_samples)])
                 else:
                     self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[self.current_sample+delay_sample])
                 self.boundary_constraints["moving-frame"]["translational"]["final"] = FSt_end
-                self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[int(self.current_sample*100/self.number_samples)])
+                self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[round(self.current_sample*100/self.number_samples)])
                 self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
 
                 self.initial_values["trajectory"]["position"] += self.home
@@ -330,25 +336,29 @@ class invariants_traj_gen_node:
                 # Generate trajectory
                 self.invariants_traj, self.pos_w_traj, self.R_w_traj, self.FSt_w_traj, self.FSr_w_traj, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True)
                 print(inv_err)
-                self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
 
-                # Publish trajectory
-                trajectory = Trajectory()
-                quaternion = rot2quat(self.R_w_traj)
-                for i in range(self.invariants_traj.shape[0]):
-                    pose = Pose()
-                    pose.position.x = self.pos_w_traj[i,0]
-                    pose.position.y = self.pos_w_traj[i,1]
-                    pose.position.z = self.pos_w_traj[i,2]
-                    pose.orientation.x = quaternion[i,0]
-                    pose.orientation.y = quaternion[i,1]
-                    pose.orientation.z = quaternion[i,2]
-                    pose.orientation.w = quaternion[i,3]
-                    trajectory.poses.append(pose)
-                if np.linalg.norm(self.pos_w_tgt - self.pos_w_traj[-1]) < 0.01:
-                    self.publisher_trajectory.publish(trajectory)
+                if np.linalg.norm(self.pos_w_tgt - self.pos_w_traj[-1]) < 0.01 and inv_err < 100:
+                    self.enter_recovery_mode = 0
+                    self.recovery_target = self.pose_w_tgt.copy()
+                    self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
+                    # Publish trajectory
+                    self.trajectory = Trajectory()
+                    quaternion = rot2quat(self.R_w_traj)
+                    for i in range(self.invariants_traj.shape[0]):
+                        pose = Pose()
+                        pose.position.x = self.pos_w_traj[i,0]
+                        pose.position.y = self.pos_w_traj[i,1]
+                        pose.position.z = self.pos_w_traj[i,2]
+                        pose.orientation.x = quaternion[i,0]
+                        pose.orientation.y = quaternion[i,1]
+                        pose.orientation.z = quaternion[i,2]
+                        pose.orientation.w = quaternion[i,3]
+                        self.trajectory.poses.append(pose)
                 else:
                     print("NOT PUBLISHING, ERROR VALUE:", np.linalg.norm(self.pos_w_tgt - pos_w_tcp))
+                    print("ENTERING RECOVERY MODE")
+                    self.enter_recovery_mode = 1
+                    self.pose_w_tgt = self.recovery_target.copy()
 
                 # arclength_n = np.linspace(0,self.invariant_model[-1,0],99)
                 # if self.counter == 1:
@@ -414,8 +424,9 @@ class invariants_traj_gen_node:
 
             self.previous_target = self.pos_w_tgt
 
-            # TODO Implement recovery strategy
-            
+            if self.counter > 0:
+                self.publisher_trajectory.publish(self.trajectory)
+
             outputs = np.hstack((self.progress_offset, self.pose_w_tgt, self.enter_recovery_mode, self.alpha))
 
             self.pub_node_output.publish(Float64MultiArray(data=outputs))

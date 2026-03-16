@@ -18,20 +18,21 @@ class SimulateBottlePos:
         # self.initial_bottle_position = np.array([0.4,0.1,-0.074])
         # self.moved_bottle_position = np.array([0.45,-0.15,-0.074])
         # FOR CRATE FILLING
+        LA1 = np.array([0.21,-0.39,0.015]) 
+        LB1 = np.array([0.21,-0.3,0.015]) 
+        LC1 = np.array([0.21,-0.21,0.015]) 
+        LC2 = np.array([0.3,-0.21,0.015]) 
+        MA2 = np.array([0.3,-0.09,0.015]) 
+        MB2 = np.array([0.3,0,0.015]) 
+        MC2 = np.array([0.3,0.09,0.015]) 
+        MC3 = np.array([0.39,0.09,0.015]) 
+        RA3 = np.array([0.39,0.21,0.015]) 
+        RB1 = np.array([0.21,0.3,0.015]) 
+        RB2 = np.array([0.3,0.3,0.015]) 
         self.pos_w_home = np.array([0.25798,-0.0016,0.2561])
-        self.initial_bottle_position = np.array([0.3,0,0.015]) # MB2
-        self.moved_bottle_position = np.array([0.3,-0.21,0.015]) # LC2
-        # np.array([0.21,-0.39,0.015]) # LA1
-        # np.array([0.21,-0.3,0.015]) # LB1
-        # np.array([0.21,-0.21,0.015]) # LC1
-        # np.array([0.3,-0.21,0.015]) # LC2
-        # np.array([0.3,-0.09,0.015]) # MA2
-        # np.array([0.3,0,0.015]) # MB2
-        # np.array([0.3,0.09,0.015]) # MC2
-        # np.array([0.39,0.09,0.015]) # MC3
-        # np.array([0.39,0.21,0.015]) # RA3
-        # np.array([0.21,0.3,0.015]) # RB1
-        # np.array([0.3,0.3,0.015]) # RB2
+        self.initial_bottle_position = MB2
+        self.moved_bottle_position = LC2
+
         self.bottle_pos = np.array([0,0,0])
         self.initial_time = 0
         self.motion_duration = 7
