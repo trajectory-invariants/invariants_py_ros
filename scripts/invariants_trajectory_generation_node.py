@@ -264,9 +264,9 @@ class invariants_traj_gen_node:
             self.pose_w_tgt = np.hstack([self.pos_w_tgt,np.array([quat_w_tgt[3],quat_w_tgt[0],quat_w_tgt[1],quat_w_tgt[2]])])
 
             # Check if the robot position is within 0.01 m of the model trajectory
-            dist_robot_to_model = np.array([np.linalg.norm(self.tf[:3] - self.pos_w_traj[i,:]) for i in range(self.number_samples)])
+            dist_robot_to_model = np.array([np.linalg.norm(self.tf[:3] - self.previous_model_trajectory[i,:]) for i in range(self.number_samples)])
             # print("MIN", min(dist_robot_to_model))
-            if any(dist_robot_to_model  < 0.02) and all(np.isclose(self.pos_w_bottle,self.pos_w_traj[-1,:],0,0.002)): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
+            if any(dist_robot_to_model  < 0.02) and all(np.isclose(self.pos_w_bottle,self.previous_model_trajectory[-1,:],0,0.002)): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
                 self.condition = 1
             else:
                 self.condition = 0
@@ -279,14 +279,20 @@ class invariants_traj_gen_node:
 
             # Predict the robot pose in 100ms (ros node rate) by taking the model pose in a few delay_sample
             delay_sample = 1#2+int(self.factor_execution_speed/2)# int(2*self.factor_execution_speed) # (-self.enter_recovery_mode+1) # (-2*self.enter_recovery_mode+1) * 
-            if all(self.jointvel[i] < 1e-6 for i in range(6)) or self.enter_recovery_mode == 1:
+            if all(self.jointvel[i] < 1e-6 for i in range(6)):
                 pos_w_tcp = np.array([self.tf[0],self.tf[1],self.tf[2]])
             else:
-                if self.current_sample+ delay_sample>= len(self.previous_model_trajectory):
-                    pos_w_tcp = self.previous_model_trajectory[self.current_sample]
+                if self.enter_recovery_mode == 0:
+                    if self.current_sample+ delay_sample>= len(self.previous_model_trajectory):
+                        pos_w_tcp = self.previous_model_trajectory[self.current_sample]
+                    else:
+                        pos_w_tcp = self.previous_model_trajectory[self.current_sample+delay_sample]
+                        # print("AAAAAAAAAAAAAAAA", pos_w_tcp, self.current_sample+delay_sample, self.condition)
                 else:
-                    pos_w_tcp = self.pos_w_traj[self.current_sample+delay_sample]
-                    # print("AAAAAAAAAAAAAAAA", pos_w_tcp, self.current_sample+delay_sample, self.condition)
+                    if self.current_sample - delay_sample < 0:
+                        pos_w_tcp = self.previous_model_trajectory[0]
+                    else:
+                        pos_w_tcp = self.previous_model_trajectory[self.current_sample-delay_sample]
             R_w_tcp = quat2rot(np.hstack([self.tf[3], self.tf[4], self.tf[5],self.tf[6]]).reshape(1,4)).reshape(3,3)
             if self.counter == 0:
                 self.previous_target = self.pos_w_tgt
@@ -324,7 +330,11 @@ class invariants_traj_gen_node:
                     # print("BBBBBBBBBBBBBBBBBBBBBBBBBBB",int((self.current_sample+delay_sample)*100/self.number_samples), self.current_sample)
                     self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[round((self.current_sample)*100/self.number_samples)])
                 else:
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[self.current_sample+delay_sample])
+                    if self.enter_recovery_mode == 0:
+                        self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[self.current_sample+delay_sample])
+                    else:
+                        self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[self.current_sample-delay_sample])
+
                 self.boundary_constraints["moving-frame"]["translational"]["final"] = FSt_end
                 self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[round(self.current_sample*100/self.number_samples)])
                 self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
@@ -333,11 +343,22 @@ class invariants_traj_gen_node:
 
                 # print(pos_w_tcp,self.tf[:3],self.pos_w_tgt,self.current_sample+delay_sample,self.progress)
 
+                if self.enter_recovery_mode == 1:
+                    self.initial_values["trajectory"]["position"] = np.array([np.interp(np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=self.number_samples),np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_pos[round(s_prior*len(self.demo_pos)):,i]) for i in range(3)]).T
+                    # self.initial_values["trajectory"]["orientation"] =
+                    self.initial_values["moving-frame"]["translational"] = interpR(np.linspace(s_prior,1,self.number_samples),np.linspace(s_prior,1,len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_FSt[round(s_prior*len(self.demo_pos)):])
+                    # self.initial_values["moving-frame"]["rotational"] =
+                    self.initial_values["invariants"] = model_invariants
+                    self.initial_values["trajectory"]["position"] += self.home
+                    print(s_prior,self.initial_values["trajectory"]["position"][0,:],self.pos_w_traj[0,:])
+                    print(self.current_sample,self.boundary_constraints["position"]["initial"],self.home)
+                    # self.initial_values["joint-values"]
+
                 # Generate trajectory
-                self.invariants_traj, self.pos_w_traj, self.R_w_traj, self.FSt_w_traj, self.FSr_w_traj, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True)
+                self.invariants_traj, self.pos_w_traj, self.R_w_traj, self.FSt_w_traj, self.FSr_w_traj, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True,recovery_mode=self.enter_recovery_mode)
                 print(inv_err)
 
-                if np.linalg.norm(self.pos_w_tgt - self.pos_w_traj[-1]) < 0.01 and inv_err < 100:
+                if np.linalg.norm(self.pos_w_tgt - self.pos_w_traj[-1]) < 0.01 and inv_err < 100 and np.linalg.norm(self.pos_w_traj[0,:]-pos_w_tcp) < 0.02:
                     self.enter_recovery_mode = 0
                     self.recovery_target = self.pose_w_tgt.copy()
                     self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
