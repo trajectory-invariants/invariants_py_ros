@@ -22,6 +22,15 @@ import rospkg
 from invariants_py import data_handler as dh
 import matplotlib.pyplot as plt
 
+class OCP_results:
+
+    def __init__(self,FSt_frames,FSr_frames,Obj_pos,Obj_frames,invariants):
+        self.FSt_frames = FSt_frames
+        self.FSr_frames = FSr_frames
+        self.Obj_pos = Obj_pos
+        self.Obj_frames = Obj_frames
+        self.invariants = invariants
+
 class invariants_traj_gen_node:
 
     def __init__(self, name = "talker") -> None:
@@ -50,10 +59,7 @@ class invariants_traj_gen_node:
         self.quat_demo = np.array([0.907466,-0.416623,0.0328278,-0.0430416]) # orientation quaternion (defined as [qw,qx,qy,qz]) of the final pose of the human demonstration
         self.radius = 0.0145 + 0.015 # radius of the bottle (stella :0.0145, FM: 0.021) + buffer of 0.015
         self.alpha = np.array([np.pi/2]) # angle of approach direction around z-axis in rad
-        self.pos_w_traj = 100*np.ones((100,3))
         self.home = np.zeros(3)
-        self.invariants_traj = np.zeros((100,6)) 
-        self.R_w_traj = np.ones((100,3,3))*np.eye(3)
         self.trajectory = Trajectory()
 
         rospack = rospkg.RosPack()
@@ -153,6 +159,9 @@ class invariants_traj_gen_node:
           "inv_demo": np.loadtxt(dh.find_data_path("dummy_inv.csv"),delimiter=","), 
           "R_t": np.loadtxt(dh.find_data_path("dummy_R_t.csv"),delimiter=",").reshape(100,3,3), 
           "R_r": np.loadtxt(dh.find_data_path("dummy_R_r.csv"),delimiter=",").reshape(100,3,3)}
+        
+        self.new_traj = OCP_results(FSt_frames = [], FSr_frames = [], Obj_pos = 100*np.ones((self.number_samples,3)), Obj_frames = np.ones((self.number_samples,3,3))*np.eye(3), invariants = np.zeros((self.number_samples,6)))
+        self.previous_traj = OCP_results(FSt_frames = [], FSr_frames = [], Obj_pos = 100*np.ones((self.number_samples,3)), Obj_frames = np.ones((self.number_samples,3,3))*np.eye(3), invariants = np.zeros((self.number_samples,6)))
 
         self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params, dummy=dummy)
         
@@ -250,7 +259,7 @@ class invariants_traj_gen_node:
                 self.pos_w_bottle = self.bottle_pos_real
         
             if self.enter_recovery_mode == 0:
-                self.previous_model_trajectory = self.pos_w_traj
+                self.previous_traj = self.new_traj
 
             # Define the target pose, by adding the bottle radius distance to the bottle position measurement and a small offset to ensure no contact between opener and bottle
             # Rotate the target pose around the z-axis by the alpha_deg angle (currently fixed), defining the desired approach direction
@@ -264,14 +273,12 @@ class invariants_traj_gen_node:
             self.pose_w_tgt = np.hstack([self.pos_w_tgt,np.array([quat_w_tgt[3],quat_w_tgt[0],quat_w_tgt[1],quat_w_tgt[2]])])
 
             # Check if the robot position is within 0.01 m of the model trajectory
-            dist_robot_to_model = np.array([np.linalg.norm(self.tf[:3] - self.previous_model_trajectory[i,:]) for i in range(self.number_samples)])
+            dist_robot_to_model = np.array([np.linalg.norm(self.tf[:3] - self.previous_traj.Obj_pos[i,:]) for i in range(self.number_samples)])
             # print("MIN", min(dist_robot_to_model))
-            if any(dist_robot_to_model  < 0.02) and all(np.isclose(self.pos_w_bottle,self.previous_model_trajectory[-1,:],0,0.002)): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
+            if any(dist_robot_to_model  < 0.02) and all(np.isclose(self.pos_w_bottle,self.previous_traj.Obj_pos[-1,:],0,0.002)): # it checks if the robot is within 1cm away of the interp_samples of the model trajectory
                 self.condition = 1
             else:
                 self.condition = 0
-                # print(self.pos_w_bottle,self.pos_w_traj[-1,:])
-                # print("DIIIIST", dist_robot_to_model)
             self.current_sample = np.argmin(dist_robot_to_model)
 
     def generate_trajectory(self):
@@ -283,22 +290,22 @@ class invariants_traj_gen_node:
                 pos_w_tcp = np.array([self.tf[0],self.tf[1],self.tf[2]])
             else:
                 if self.enter_recovery_mode == 0:
-                    if self.current_sample+ delay_sample>= len(self.previous_model_trajectory):
-                        pos_w_tcp = self.previous_model_trajectory[self.current_sample]
+                    if self.current_sample+ delay_sample>= len(self.previous_traj.Obj_pos):
+                        pos_w_tcp = self.previous_traj.Obj_pos[self.current_sample]
                     else:
-                        pos_w_tcp = self.previous_model_trajectory[self.current_sample+delay_sample]
+                        pos_w_tcp = self.previous_traj.Obj_pos[self.current_sample+delay_sample]
                         # print("AAAAAAAAAAAAAAAA", pos_w_tcp, self.current_sample+delay_sample, self.condition)
                 else:
                     if self.current_sample - delay_sample < 0:
-                        pos_w_tcp = self.previous_model_trajectory[0]
+                        pos_w_tcp = self.previous_traj.Obj_pos[0]
                     else:
-                        pos_w_tcp = self.previous_model_trajectory[self.current_sample-delay_sample]
+                        pos_w_tcp = self.previous_traj.Obj_pos[self.current_sample-delay_sample]
             R_w_tcp = quat2rot(np.hstack([self.tf[3], self.tf[4], self.tf[5],self.tf[6]]).reshape(1,4)).reshape(3,3)
             if self.counter == 0:
                 self.previous_target = self.pos_w_tgt
             prev_dist_to_target = np.linalg.norm(self.previous_target - pos_w_tcp)
             if self.condition == 0 and not self.home[0] == 0:
-                # print("DDDDDDDDDDDDDDDDDDDDDDDD", self.invariants_traj[self.current_sample,3],np.rad2deg(np.arccos(np.dot(self.pos_w_traj[-1,:]-np.array(self.tf[:3]),self.pos_w_tgt-np.array(self.tf[:3]))/(np.linalg.norm(self.pos_w_traj[-1,:]-np.array(self.tf[:3]))*np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3]))))), self.pos_w_traj[-1,:], self.pos_w_tgt)
+                # print("DDDDDDDDDDDDDDDDDDDDDDDD", self.new_traj.invariants[self.current_sample,3],np.rad2deg(np.arccos(np.dot(self.new_traj.Obj_pos[-1,:]-np.array(self.tf[:3]),self.pos_w_tgt-np.array(self.tf[:3]))/(np.linalg.norm(self.new_traj.Obj_pos[-1,:]-np.array(self.tf[:3]))*np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3]))))), self.new_traj.Obj_pos[-1,:], self.pos_w_tgt)
                 # Calculate s_prior by comparing the distance of the current robot pose to the previous target and to the current target
                 dist_to_target = np.linalg.norm(self.pos_w_tgt - pos_w_tcp)
                 self.progress_sum = self.progress_fv + self.progress_offset_previous
@@ -318,7 +325,7 @@ class invariants_traj_gen_node:
                 # Resample model invariants to desired number of self.number_samples samples
                 # current_sample = round(self.progress*len(self.invariant_model))
                 spline_invariant_model = sh.create_spline_model(self.invariant_model[:,0], self.invariant_model[:,1:])
-                progress_values = np.linspace(self.progress,self.invariant_model[-1,0],self.number_samples)
+                progress_values = np.linspace(s_prior,self.invariant_model[-1,0],self.number_samples)
                 model_invariants,progress_step = sh.interpolate_invariants(spline_invariant_model, progress_values)
                 
                 # Specify the boundary constraints
@@ -328,15 +335,16 @@ class invariants_traj_gen_node:
                 self.boundary_constraints["orientation"]["final"] = R_w_tgt # Start simple, where R_w_tgt is constant and equal to demo_Robj (for cf), TODO add variability in orientation!
                 if self.counter == 0:
                     # print("BBBBBBBBBBBBBBBBBBBBBBBBBBB",int((self.current_sample+delay_sample)*100/self.number_samples), self.current_sample)
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[round((self.current_sample)*100/self.number_samples)])
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[round((self.current_sample)*len(self.demo_pos)/self.number_samples)])
+                    self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[round((self.current_sample)*len(self.demo_pos)/self.number_samples)])
                 else:
                     if self.enter_recovery_mode == 0:
-                        self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[self.current_sample+delay_sample])
+                        self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.previous_traj.FSt_frames[self.current_sample+delay_sample])
+                        self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.previous_traj.FSr_frames[self.current_sample+delay_sample])
                     else:
-                        self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.FSt_w_traj[self.current_sample-delay_sample])
-
+                        self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.previous_traj.FSt_frames[self.current_sample-delay_sample])
+                        self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.previous_traj.FSr_frames[self.current_sample-delay_sample])
                 self.boundary_constraints["moving-frame"]["translational"]["final"] = FSt_end
-                self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[round(self.current_sample*100/self.number_samples)])
                 self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
 
                 self.initial_values["trajectory"]["position"] += self.home
@@ -350,26 +358,26 @@ class invariants_traj_gen_node:
                     # self.initial_values["moving-frame"]["rotational"] =
                     self.initial_values["invariants"] = model_invariants
                     self.initial_values["trajectory"]["position"] += self.home
-                    print(s_prior,self.initial_values["trajectory"]["position"][0,:],self.pos_w_traj[0,:])
+                    print(s_prior,self.initial_values["trajectory"]["position"][0,:],self.new_traj.Obj_pos[0,:])
                     print(self.current_sample,self.boundary_constraints["position"]["initial"],self.home)
                     # self.initial_values["joint-values"]
 
                 # Generate trajectory
-                self.invariants_traj, self.pos_w_traj, self.R_w_traj, self.FSt_w_traj, self.FSr_w_traj, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True,recovery_mode=self.enter_recovery_mode)
+                self.new_traj.invariants, self.new_traj.Obj_pos, self.new_traj.Obj_frames, self.new_traj.FSt_frames, self.new_traj.FSr_frames, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True,recovery_mode=self.enter_recovery_mode)
                 print(inv_err)
 
-                if np.linalg.norm(self.pos_w_tgt - self.pos_w_traj[-1]) < 0.01 and inv_err < 100 and np.linalg.norm(self.pos_w_traj[0,:]-pos_w_tcp) < 0.02:
+                if np.linalg.norm(self.pos_w_tgt - self.new_traj.Obj_pos[-1]) < 0.01 and inv_err < 100 and np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp) < 0.02:
                     self.enter_recovery_mode = 0
                     self.recovery_target = self.pose_w_tgt.copy()
                     self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
                     # Publish trajectory
                     self.trajectory = Trajectory()
-                    quaternion = rot2quat(self.R_w_traj)
-                    for i in range(self.invariants_traj.shape[0]):
+                    quaternion = rot2quat(self.new_traj.Obj_frames)
+                    for i in range(self.new_traj.invariants.shape[0]):
                         pose = Pose()
-                        pose.position.x = self.pos_w_traj[i,0]
-                        pose.position.y = self.pos_w_traj[i,1]
-                        pose.position.z = self.pos_w_traj[i,2]
+                        pose.position.x = self.new_traj.Obj_pos[i,0]
+                        pose.position.y = self.new_traj.Obj_pos[i,1]
+                        pose.position.z = self.new_traj.Obj_pos[i,2]
                         pose.orientation.x = quaternion[i,0]
                         pose.orientation.y = quaternion[i,1]
                         pose.orientation.z = quaternion[i,2]
@@ -386,37 +394,37 @@ class invariants_traj_gen_node:
                 #     fig = plt.figure()
                 #     plt.subplot(2,3,1)
                 #     plt.plot(arclength_n,self.invariant_model[:,1],'b')
-                #     plt.plot(progress_values,self.invariants_traj[:,0],'r')
+                #     plt.plot(progress_values,self.new_traj.invariants[:,0],'r')
                 #     plt.plot(0,0)
                 #     plt.title('i_r1')
 
                 #     plt.subplot(2,3,2)
                 #     plt.plot(arclength_n,self.invariant_model[:,2],'b')
-                #     plt.plot(progress_values,self.invariants_traj[:,1],'r')
+                #     plt.plot(progress_values,self.new_traj.invariants[:,1],'r')
                 #     plt.plot(0,0)
                 #     plt.title('i_r2')
 
                 #     plt.subplot(2,3,3)
                 #     plt.plot(arclength_n,self.invariant_model[:,3],'b')
-                #     plt.plot(progress_values,self.invariants_traj[:,2],'r')
+                #     plt.plot(progress_values,self.new_traj.invariants[:,2],'r')
                 #     plt.plot(0,0)
                 #     plt.title('i_r3')
 
                 #     plt.subplot(2,3,4)
                 #     plt.plot(arclength_n,self.invariant_model[:,4],'b')
-                #     plt.plot(progress_values,self.invariants_traj[:,3],'r')
+                #     plt.plot(progress_values,self.new_traj.invariants[:,3],'r')
                 #     plt.plot(0,0)
                 #     plt.title('i_t1')
 
                 #     plt.subplot(2,3,5)
                 #     plt.plot(arclength_n,self.invariant_model[:,5],'b')
-                #     plt.plot(progress_values,self.invariants_traj[:,4],'r')
+                #     plt.plot(progress_values,self.new_traj.invariants[:,4],'r')
                 #     plt.plot(0,0)
                 #     plt.title('i_t2')
 
                 #     plt.subplot(2,3,6)
                 #     plt.plot(arclength_n,self.invariant_model[:,6],'b')
-                #     plt.plot(progress_values,self.invariants_traj[:,5],'r')
+                #     plt.plot(progress_values,self.new_traj.invariants[:,5],'r')
                 #     plt.plot(0,0)
                 #     plt.title('i_t3')
 
@@ -424,7 +432,7 @@ class invariants_traj_gen_node:
 
                 # Add points to the marker
                 self.marker.points = []
-                for point in self.pos_w_traj:  # Assuming traj is a numpy array of shape (self.number_samples, 3)
+                for point in self.new_traj.Obj_pos:  # Assuming traj is a numpy array of shape (self.number_samples, 3)
                     p = Point()
                     p.x = point[0]
                     p.y = point[1]
