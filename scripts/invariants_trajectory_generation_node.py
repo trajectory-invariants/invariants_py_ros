@@ -56,16 +56,53 @@ class invariants_traj_gen_node:
         self.pos_w_tgt = None
         self.bottle_pos_real = np.array([100,100,100]) # to understand if use real position measurements or simulated
         self.bottle_pos_sim = np.array([100,100,100])
-        self.quat_demo = np.array([0.907466,-0.416623,0.0328278,-0.0430416]) # orientation quaternion (defined as [qw,qx,qy,qz]) of the final pose of the human demonstration
-        self.radius = 0.0145 + 0.015 # radius of the bottle (stella :0.0145, FM: 0.021) + buffer of 0.015
-        self.alpha = np.array([np.pi/2]) # angle of approach direction around z-axis in rad
         self.home = np.zeros(3)
         self.trajectory = Trajectory()
 
         rospack = rospkg.RosPack()
-        #%% User input
+        #%%
+        rospy.Subscriber('sim_bottle_pos_pub', Float64MultiArray, self.callback_bottle_pos_sim)
+        rospy.Subscriber('/pickit/objects_wrt_robot_frame', Float64MultiArray, self.callback_bottle_pos_real) # THIS IS EXAMPLE OF BOTTLE POSITION DETECTED BY SENSOR - NOT IMPLEMENTED CORRECTLY YET (update also in listener_node)
+        rospy.Subscriber('tcp_pose', Float64MultiArray, self.callback_tf)
+        rospy.Subscriber('progress', Float64MultiArray, self.callback_progress) # I need some kind of progress, representing the progress of the robot along the trajectory
+        rospy.Subscriber('progress_fv', Float64MultiArray, self.callback_progress_fv) # This should be the value of the progress feature variable
+        rospy.Subscriber('progress_offset_previous', Float64MultiArray, self.callback_progress_offset_previous) # It's the progress offset of the previous sample
+        rospy.Subscriber('factor_execution_speed', Float64MultiArray, self.callback_factorexecspeed)
+        rospy.Subscriber('jointvel', Float64MultiArray, self.callback_jointvel)
+        rospy.Subscriber('home_position', Float64MultiArray, self.callback_home)
+        self.pub_node_output = rospy.Publisher('/raw_inv_gen_node_output', Float64MultiArray, queue_size=10, latch=True)
+        self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
+        self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
+        #%% User inputs
+        self.number_samples = 50
+        # Solver choice
         self.solver = "fatrop" # options "ipopt", "fatrop"
-        
+
+        # OCP params
+        # Robot parameters
+        self.robot_params = {
+            "urdf_file_name": None, # use None if do not want to include robot model
+            # "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values for UR10
+            "q_init": np.array([-0.06999619209628122, -0.9936042374309739, 0.04052275688381114, -3.040355360901146, 0.024184582866498106, 2.0659148485780445, 0.7930461100688347]), # Initial joint values for Franka Panda
+            "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
+        }
+        # Define OCP weights
+        self.weights_params = {
+            "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
+            # "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 50, 10.0, 10.0]), # to use when include robot kin model
+            "w_high_start": round(0.7*self.number_samples),
+            "w_high_end": self.number_samples,
+            "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 5, 1, 1]),
+            # "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 50, 10, 10]), # to use when include robot kin model
+            "w_high_active": 1
+        }
+
+        # Parameters for orientation defintion
+        self.quat_demo = np.array([0.907466,-0.416623,0.0328278,-0.0430416]) # orientation quaternion (defined as [qw,qx,qy,qz]) of the final pose of the human demonstration
+        self.radius = 0.0145 + 0.015 # radius of the bottle (stella :0.0145, FM: 0.021) + buffer of 0.015
+        self.alpha = np.array([np.pi/2]) # angle of approach direction around z-axis in rad
+
+        # Choice of demonstration
         # Crate filling
         model_filename = rospack.get_path("invariants_py_ros")+"/data/"+"cf_inv.csv"
         pos_filename = rospack.get_path("invariants_py_ros")+"/data/"+"cf_pobj.csv"
@@ -97,29 +134,12 @@ class invariants_traj_gen_node:
         loaded_FSr = np.loadtxt(FSr_filename, delimiter=",")
         self.demo_FSr = loaded_FSr.reshape(loaded_FSr.shape[0], loaded_FSr.shape[1] // 3, 3)
 
-        #%%
-        rospy.Subscriber('sim_bottle_pos_pub', Float64MultiArray, self.callback_bottle_pos_sim)
-        rospy.Subscriber('/pickit/objects_wrt_robot_frame', Float64MultiArray, self.callback_bottle_pos_real) # THIS IS EXAMPLE OF BOTTLE POSITION DETECTED BY SENSOR - NOT IMPLEMENTED CORRECTLY YET (update also in listener_node)
-        rospy.Subscriber('tcp_pose', Float64MultiArray, self.callback_tf)
-        rospy.Subscriber('progress', Float64MultiArray, self.callback_progress) # I need some kind of progress, representing the progress of the robot along the trajectory
-        rospy.Subscriber('progress_fv', Float64MultiArray, self.callback_progress_fv) # This should be the value of the progress feature variable
-        rospy.Subscriber('progress_offset_previous', Float64MultiArray, self.callback_progress_offset_previous) # It's the progress offset of the previous sample
-        rospy.Subscriber('factor_execution_speed', Float64MultiArray, self.callback_factorexecspeed)
-        rospy.Subscriber('jointvel', Float64MultiArray, self.callback_jointvel)
-        rospy.Subscriber('home_position', Float64MultiArray, self.callback_home)
-        self.pub_node_output = rospy.Publisher('/raw_inv_gen_node_output', Float64MultiArray, queue_size=10, latch=True)
-        self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
-        self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
-
-           
-        self.number_samples = 50
-
         # new constraints       
         alpha = 0
         rotate = R.from_euler('z', alpha, degrees=True)
         R_w_tgt =  orthonormalize(rotate.as_matrix() @ self.demo_Robj[-1])
         FSt_end = orthonormalize(rotate.as_matrix() @ self.demo_FSt[-1])
-        
+
         # # Linear initialization
         R_obj_init = interpR(np.linspace(0, 1, self.number_samples), [0,1], np.array([np.eye(3), R_w_tgt]))
 
@@ -146,14 +166,6 @@ class invariants_traj_gen_node:
                 }
             },
         }
-
-        self.robot_params = {
-            "urdf_file_name": None, # use None if do not want to include robot model
-            # "q_init": np.array([-np.pi, -2.27, 2.27, -np.pi/2, -np.pi/2, np.pi/4]), # Initial joint values
-            "q_init": np.array([-0.06999619209628122, -0.9936042374309739, 0.04052275688381114, -3.040355360901146, 0.024184582866498106, 2.0659148485780445, 0.7930461100688347]), # Initial joint values for Franka Panda
-            "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
-        }
-        # Franka q_init: [-0.03594372660758203, -1.7589981400814376, -1.9254516473826875, -1.9436872720551073, -0.3177960551049983, 1.981110099809029,-1.0311961190588514]
         
         dummy = { "inv_sol": np.loadtxt(dh.find_data_path("dummy_sol.csv"),delimiter=","), 
           "inv_demo": np.loadtxt(dh.find_data_path("dummy_inv.csv"),delimiter=","), 
@@ -169,17 +181,6 @@ class invariants_traj_gen_node:
         spline_invariant_model = sh.create_spline_model(self.invariant_model[:,0], self.invariant_model[:,1:])
         progress_values = np.linspace(self.progress,self.invariant_model[-1,0],self.number_samples)
         model_invariants,progress_step = sh.interpolate_invariants(spline_invariant_model, progress_values)
-
-        # Define OCP weights
-        self.weights_params = {
-            "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
-            # "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 50, 10.0, 10.0]), # to use when include robot kin model
-            "w_high_start": round(0.7*self.number_samples),
-            "w_high_end": self.number_samples,
-            "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 5, 1, 1]),
-            # "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 50, 10, 10]), # to use when include robot kin model
-            "w_high_active": 1
-        }
 
         self.initial_values = {
             "trajectory": {
@@ -494,5 +495,6 @@ if __name__ == '__main__':
     rate = rospy.Rate(10) # 10hz
     while not rospy.is_shutdown():
         inv_node.check_condition()
+        # if inv_node.condition == 0:
         inv_node.generate_trajectory()
         rate.sleep()
