@@ -173,9 +173,11 @@ class invariants_traj_gen_node:
         # Define OCP weights
         self.weights_params = {
             "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
+            # "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 50, 10.0, 10.0]), # to use when include robot kin model
             "w_high_start": round(0.7*self.number_samples),
             "w_high_end": self.number_samples,
             "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 5, 1, 1]),
+            # "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 50, 10, 10]), # to use when include robot kin model
             "w_high_active": 1
         }
 
@@ -259,7 +261,9 @@ class invariants_traj_gen_node:
                 self.pos_w_bottle = self.bottle_pos_real
         
             if self.enter_recovery_mode == 0:
-                self.previous_traj = self.new_traj
+                self.previous_traj.Obj_pos = self.new_traj.Obj_pos.copy()
+                self.previous_traj.FSt_frames = self.new_traj.FSt_frames.copy()
+                self.previous_traj.FSr_frames = self.new_traj.FSr_frames.copy()
 
             # Define the target pose, by adding the bottle radius distance to the bottle position measurement and a small offset to ensure no contact between opener and bottle
             # Rotate the target pose around the z-axis by the alpha_deg angle (currently fixed), defining the desired approach direction
@@ -279,6 +283,14 @@ class invariants_traj_gen_node:
                 self.condition = 1
             else:
                 self.condition = 0
+                if not any(dist_robot_to_model  < 0.02):
+                    if all(np.isclose(self.pos_w_bottle,self.previous_traj.Obj_pos[-1,:],0,0.002)):
+                        print(f"Need new trajectory because the min dist_robot_to_model is {min(dist_robot_to_model)} > 0.02")
+                    else:
+                        print(f"Need new trajectory because the min dist_robot_to_model is {min(dist_robot_to_model)} > 0.02 and trajectory endpoint doesn't end in target diff_vector = {self.previous_traj.Obj_pos[-1,:]-self.pos_w_bottle}")
+                else:
+                    print(f"Need new trajectory because trajectory endpoint doesn't end in target diff_vector = {self.previous_traj.Obj_pos[-1,:]-self.pos_w_bottle}")
+
             self.current_sample = np.argmin(dist_robot_to_model)
 
     def generate_trajectory(self):
@@ -304,7 +316,7 @@ class invariants_traj_gen_node:
             if self.counter == 0:
                 self.previous_target = self.pos_w_tgt
             prev_dist_to_target = np.linalg.norm(self.previous_target - pos_w_tcp)
-            if self.condition == 0 and not self.home[0] == 0:
+            if self.condition == 0 and not self.home[0] == 0:# and self.counter < 2:
                 # print("DDDDDDDDDDDDDDDDDDDDDDDD", self.new_traj.invariants[self.current_sample,3],np.rad2deg(np.arccos(np.dot(self.new_traj.Obj_pos[-1,:]-np.array(self.tf[:3]),self.pos_w_tgt-np.array(self.tf[:3]))/(np.linalg.norm(self.new_traj.Obj_pos[-1,:]-np.array(self.tf[:3]))*np.linalg.norm(self.pos_w_tgt-np.array(self.tf[:3]))))), self.new_traj.Obj_pos[-1,:], self.pos_w_tgt)
                 # Calculate s_prior by comparing the distance of the current robot pose to the previous target and to the current target
                 dist_to_target = np.linalg.norm(self.pos_w_tgt - pos_w_tcp)
@@ -358,15 +370,21 @@ class invariants_traj_gen_node:
                     # self.initial_values["moving-frame"]["rotational"] =
                     self.initial_values["invariants"] = model_invariants
                     self.initial_values["trajectory"]["position"] += self.home
-                    print(s_prior,self.initial_values["trajectory"]["position"][0,:],self.new_traj.Obj_pos[0,:])
-                    print(self.current_sample,self.boundary_constraints["position"]["initial"],self.home)
+                    A = self.initial_values["trajectory"]["position"][0,:]
+                    print(f"s_prior= {s_prior},init_pos start = {A}, first point old traj {self.new_traj.Obj_pos[0,:]}")
+                    B = self.boundary_constraints["position"]["initial"]
+                    print(f"current sample = {self.current_sample}, bound constr pos init {B},home pos {self.home}")
                     # self.initial_values["joint-values"]
 
                 # Generate trajectory
+                print("")
+                print("Generating new traj")
                 self.new_traj.invariants, self.new_traj.Obj_pos, self.new_traj.Obj_frames, self.new_traj.FSt_frames, self.new_traj.FSr_frames, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True,recovery_mode=self.enter_recovery_mode)
-                print(inv_err)
+                print(f"Invariant error = {inv_err}")
 
-                if np.linalg.norm(self.pos_w_tgt - self.new_traj.Obj_pos[-1]) < 0.01 and inv_err < 100 and np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp) < 0.02:
+                max_inv_err = 30
+
+                if np.linalg.norm(self.pos_w_tgt - self.new_traj.Obj_pos[-1]) < 0.01 and inv_err < max_inv_err and np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp) < 0.02:
                     self.enter_recovery_mode = 0
                     self.recovery_target = self.pose_w_tgt.copy()
                     self.progress_offset = self.progress_offset_previous + s_prior - self.progress_sum
@@ -384,10 +402,18 @@ class invariants_traj_gen_node:
                         pose.orientation.w = quaternion[i,3]
                         self.trajectory.poses.append(pose)
                 else:
-                    print("NOT PUBLISHING, ERROR VALUE:", np.linalg.norm(self.pos_w_tgt - pos_w_tcp))
-                    print("ENTERING RECOVERY MODE")
+                    print("ENTERING RECOVERY MODE because:")
+                    if not np.linalg.norm(self.pos_w_tgt - self.new_traj.Obj_pos[-1]) < 0.01:
+                        print(f"- New trajectory doesn't reach the target, dist = {np.linalg.norm(self.pos_w_tgt - self.new_traj.Obj_pos[-1]) < 0.01} > 0.01")
+                    if inv_err >=30:
+                        print(f"- Invariants error = {inv_err} >= {max_inv_err}")
+                    if not np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp) < 0.02:
+                        print(f"- New trajectory doesn't start at pos_w_tcp, dist = {np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp) < 0.02} > 0.02")
                     self.enter_recovery_mode = 1
                     self.pose_w_tgt = self.recovery_target.copy()
+                print(f"s_prior = {s_prior}, dist initial point new traj to estimated tcp {np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp)}")
+                print(f"actual tcp pos = {self.tf[:3]},estimated tcp pos = {pos_w_tcp}, initial point new traj = {self.new_traj.Obj_pos[0,:]}")
+                print("")
 
                 # arclength_n = np.linspace(0,self.invariant_model[-1,0],99)
                 # if self.counter == 1:
