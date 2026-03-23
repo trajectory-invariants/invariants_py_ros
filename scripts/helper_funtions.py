@@ -33,7 +33,7 @@ def predict_robot_pose(delay_sample,jointvel,tf_pos,tf_quat,recovery_mode,curren
 
     return pos_w_tcp, R_w_tcp
 
-def progress_heuristic(previous_target,pos_w_tcp,pos_w_tgt,progress_fv,current_progress_offset):
+def progress_heuristic_old(previous_target,pos_w_tcp,pos_w_tgt,progress_fv,current_progress_offset):
     # Calculate s_prior by comparing the distance of the current robot pose to the previous target and to the current target
     dist_to_prev_target = np.linalg.norm(previous_target - pos_w_tcp)
     dist_to_target = np.linalg.norm(pos_w_tgt - pos_w_tcp)
@@ -44,6 +44,23 @@ def progress_heuristic(previous_target,pos_w_tcp,pos_w_tgt,progress_fv,current_p
         s_prior = 0
     elif s_prior > 0.75:
         s_prior = 0.75
+
+    return s_prior,progress_sum
+
+def setup_heuristic_lookuptable(demo_pos):
+    lookup_table = np.array([np.linalg.norm(demo_pos[i,:]-demo_pos[-1,:]) for i in range(len(demo_pos))])
+    peak = np.argmax(lookup_table)
+
+    return lookup_table,peak
+
+def progress_heuristic(pos_w_tgt,pos_w_tcp,progress_fv,current_progress_offset,lookup_table,peak):
+    progress_sum = progress_fv + current_progress_offset
+    dist_to_new_target = np.linalg.norm(pos_w_tgt - pos_w_tcp)
+    if round(progress_sum*len(lookup_table)) >= peak:
+        s_prior = (np.argmin(np.array([round(abs(lookup_table[peak+i]-dist_to_new_target),3) for i in range(len(lookup_table)-peak)])) + peak)/len(lookup_table)
+    else:
+        s_prior = (np.argmin(np.array([round(abs(lookup_table[i]-dist_to_new_target),3) for i in range(peak)])))/len(lookup_table)
+        # s_prior = np.flip(s_prior)
 
     return s_prior,progress_sum
 

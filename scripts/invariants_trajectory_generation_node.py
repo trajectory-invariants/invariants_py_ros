@@ -200,6 +200,8 @@ class invariants_traj_gen_node:
             "joint-values": self.robot_params["q_init"] if self.robot_params["urdf_file_name"] is not None else {}
         }
 
+        self.lookup_table,self.lookup_table_peak = hf.setup_heuristic_lookuptable(self.demo_pos)
+
         # Create the Marker message
         self.marker = Marker()
         self.marker.header = std_msgs.msg.Header()
@@ -292,7 +294,8 @@ class invariants_traj_gen_node:
             # Predict the robot pose in 100ms (ros node rate) by taking the model pose in self.delay_sample sample(s)
             pos_w_tcp, R_w_tcp = hf.predict_robot_pose(self.delay_sample,self.jointvel,self.tf[:3],self.tf[3:],self.enter_recovery_mode,self.current_sample,self.current_traj.Obj_pos,self.current_traj.Obj_frames)
 
-            s_prior,self.progress_sum = hf.progress_heuristic(self.previous_target,pos_w_tcp,self.pos_w_tgt,self.progress_fv,self.current_progress_offset)
+            # s_prior,self.progress_sum = hf.progress_heuristic(self.previous_target,pos_w_tcp,self.pos_w_tgt,self.progress_fv,self.current_progress_offset)
+            s_prior,self.progress_sum = hf.progress_heuristic(self.pos_w_tgt,pos_w_tcp,self.progress_fv,self.current_progress_offset,self.lookup_table,self.lookup_table_peak,)
 
             # new constraints TODO  
             alpha = 0
