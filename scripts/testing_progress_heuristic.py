@@ -12,7 +12,7 @@ lookup_table = np.array([np.linalg.norm(demo_pos[i,:]-demo_pos[-1,:]) for i in r
 # lookup_table = np.array([np.linalg.norm(self.initial_values["trajectory"]["position"][i,:]-self.demo_pos[-1,:]) for i in range(self.number_samples)])
 
 # Old  heuristic
-for k in range(10):
+for k in range(5):
     distance_old_afterpeak = lookup_table[k*10]
     progress_old_afterpeak = k/10
     # distance_old_beforepeak = 0.346
@@ -28,29 +28,26 @@ for k in range(10):
         elif s_prior_afterpeak[j] > 0.75:
             s_prior_afterpeak[j] = 0.75
 
-    if k == 9:
-        plt.plot(s_prior_afterpeak,distance_new,'m',label="Old heuristic, with different transition starting points")
-        plt.plot(progress_old_afterpeak,distance_old_afterpeak,'co',label="Transition starting position")
+    if k == 0:
+        plt.plot(distance_new,s_prior_afterpeak,'m',label="Old heuristic, with different transition starting points")
+        plt.plot(distance_old_afterpeak,progress_old_afterpeak,'co',label="Transition starting position")
     else:
-        plt.plot(s_prior_afterpeak,distance_new,'m')
-        plt.plot(progress_old_afterpeak,distance_old_afterpeak,'co')
+        plt.plot(distance_new,s_prior_afterpeak,'m')
+        plt.plot(distance_old_afterpeak,progress_old_afterpeak,'co')
 
 # Heuristic based on lookup table
 peak = np.argmax(lookup_table)
 distance_new_afterpeak = np.interp(np.linspace(0,1,N),np.linspace(0,1,len(lookup_table)-peak),lookup_table[peak:])
 distance_new_beforepeak = np.interp(np.linspace(0,1,N),np.linspace(0,1,peak),lookup_table[:peak])
-progress_new_afterpeak = []
-progress_new_beforepeak = []
+progress_new = np.zeros(2*N)
 for j in range(len(distance_new_afterpeak)):
-    progress_new_afterpeak.append((np.argmin(np.array([round(abs(lookup_table[peak+i]-distance_new_afterpeak[j]),3) for i in range(len(lookup_table)-peak)])) + peak)/len(lookup_table))
-    progress_new_beforepeak.append((np.argmin(np.array([round(abs(lookup_table[peak-i]-distance_new_beforepeak[j]),3) for i in range(peak)])))/len(lookup_table))
+    progress_new[j+N] = (np.argmin(np.array([round(abs(lookup_table[peak+i]-distance_new_afterpeak[j]),3) for i in range(len(lookup_table)-peak)])) + peak)/len(lookup_table)
+    progress_new[N-j-1] = (np.argmin(np.array([round(abs(lookup_table[peak-i-1]-distance_new_beforepeak[j]),3) for i in range(peak)])))/len(lookup_table)
 
-progress_new_beforepeak = np.flip(progress_new_beforepeak)
 
-plt.plot(np.linspace(0,1,len(demo_pos)),lookup_table,label="Human demonstration")
-plt.plot(progress_new_afterpeak,distance_new_afterpeak,'r', label="Output of new progress heuristic (lookup table)")
-plt.plot(progress_new_beforepeak,distance_new_beforepeak,'r')
-plt.xlabel("Progress given by heuristic")
-plt.ylabel("Distance tcp to new target")
+plt.plot(lookup_table,np.linspace(0,1,len(demo_pos)),label="Human demonstration")
+plt.plot(np.append(distance_new_beforepeak,distance_new_afterpeak),progress_new,'r', label="Output of new progress heuristic (lookup table)")
+plt.xlabel("Distance tcp to new target")
+plt.ylabel("Progress given by heuristic")
 plt.legend()
 plt.show()
