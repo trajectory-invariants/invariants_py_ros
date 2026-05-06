@@ -2,6 +2,7 @@ import numpy as np
 from invariants_py.kinematics.orientation_kinematics import quat2rot, rot2quat
 import invariants_py.spline_handler as sh
 import matplotlib.pyplot as plt
+from invariants_py.reparameterization import interpR
 
 def find_current_sample(tf_pos,current_traj_pos,N=50):
     # Find the sample on the current trajectory which corresponds to the current robot pose
@@ -10,26 +11,30 @@ def find_current_sample(tf_pos,current_traj_pos,N=50):
     
     return current_sample
 
-def predict_robot_pose(delay_sample,jointvel,tf_pos,tf_quat,recovery_mode,current_sample,pos_current_traj,R_current_traj):
+def predict_robot_pose(delay_sample,jointvel,tf_pos,tf_quat,recovery_mode,current_sample,pos_current_traj,R_current_traj,current_progress):
     # Predict the robot pose in 100ms (ros node rate) by taking the model pose in delay_sample sample(s)
-    if all(jointvel[i] < 1e-6 for i in range(len(jointvel))):
+    if all(abs(jointvel[i]) < 1e-6 for i in range(len(jointvel))):
         pos_w_tcp = np.array([tf_pos[0],tf_pos[1],tf_pos[2]])
         R_w_tcp = quat2rot(np.hstack([tf_quat[0], tf_quat[1], tf_quat[2],tf_quat[3]]).reshape(1,4)).reshape(3,3)
     else:
-        if recovery_mode == 0:
-            if current_sample + delay_sample>= len(pos_current_traj):
-                pos_w_tcp = pos_current_traj[current_sample]
-                R_w_tcp = R_current_traj[current_sample]
-            else:
-                pos_w_tcp = pos_current_traj[current_sample+delay_sample]
-                R_w_tcp = R_current_traj[current_sample+delay_sample]
-        else:
-            if current_sample - delay_sample < 0:
-                pos_w_tcp = pos_current_traj[0]
-                R_w_tcp = R_current_traj[0]
-            else:
-                pos_w_tcp = pos_current_traj[current_sample-delay_sample]
-                R_w_tcp = R_current_traj[current_sample-delay_sample]
+        # if recovery_mode == 0:
+        #     if current_sample + delay_sample>= len(pos_current_traj):
+        #         pos_w_tcp = pos_current_traj[current_sample]
+        #         R_w_tcp = R_current_traj[current_sample]
+        #     else:
+        #         pos_w_tcp = pos_current_traj[current_sample+delay_sample]
+        #         R_w_tcp = R_current_traj[current_sample+delay_sample]
+        # else:
+        #     if current_sample - delay_sample -1 < 0:
+        #         pos_w_tcp = pos_current_traj[0]
+        #         R_w_tcp = R_current_traj[0]
+        #     else:
+        #         pos_w_tcp = pos_current_traj[current_sample-delay_sample-1]
+        #         R_w_tcp = R_current_traj[current_sample-delay_sample-1]
+        # pos_w_tcp_test = np.array([np.interp(current_sample/50+0.08,np.linspace(0,1,num=50),pos_current_traj[:,i]) for i in range(3)])
+        pos_w_tcp = np.array([np.interp(current_progress,np.linspace(0,1,num=50),pos_current_traj[:,i]) for i in range(3)])
+        R_w_tcp = np.array([interpR([current_progress],np.linspace(0,1,num=50),R_current_traj)]).reshape(3,3)
+        # print(pos_w_tcp,pos_w_tcp_test)
 
     return pos_w_tcp, R_w_tcp
 
@@ -60,7 +65,6 @@ def progress_heuristic(pos_w_tgt,pos_w_tcp,progress_fv,current_progress_offset,l
         s_prior = (np.argmin(np.array([round(abs(lookup_table[peak+i]-dist_to_new_target),3) for i in range(len(lookup_table)-peak)])) + peak)/len(lookup_table)
     else:
         s_prior = (np.argmin(np.array([round(abs(lookup_table[i]-dist_to_new_target),3) for i in range(peak)])))/len(lookup_table)
-        # s_prior = np.flip(s_prior)
 
     return s_prior,progress_sum
 
