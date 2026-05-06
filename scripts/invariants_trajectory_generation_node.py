@@ -21,6 +21,8 @@ from ros_spline_fitting_trajectory.msg import Trajectory
 import rospkg
 from invariants_py import data_handler as dh
 import helper_funtions as hf
+from scipy.spatial.transform import Rotation as Rot
+import time
 
 class OCP_results:
 
@@ -78,7 +80,7 @@ class invariants_traj_gen_node:
         self.number_samples = 50
         self.threshold_new_target_measurement = 0.005
         self.delay_sample = 1
-        self.max_inv_err = 30
+        self.max_inv_err = 10
         self.debug_mode = True
 
 
@@ -95,7 +97,7 @@ class invariants_traj_gen_node:
         }
         # Define OCP weights
         self.weights_params = {
-            "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
+            "w_invars": 0.1/2*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
             # "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 50, 10.0, 10.0]), # to use when include robot kin model
             "w_high_start": round(0.7*self.number_samples),
             "w_high_end": self.number_samples,
@@ -182,7 +184,7 @@ class invariants_traj_gen_node:
         self.new_traj = OCP_results(FSt_frames = [], FSr_frames = [], Obj_pos = 100*np.ones((self.number_samples,3)), Obj_frames = np.ones((self.number_samples,3,3))*np.eye(3), invariants = np.zeros((self.number_samples,6)))
         self.current_traj = OCP_results(FSt_frames = [], FSr_frames = [], Obj_pos = 100*np.ones((self.number_samples,3)), Obj_frames = np.ones((self.number_samples,3,3))*np.eye(3), invariants = np.zeros((self.number_samples,6)))
 
-        self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params, dummy=dummy)
+        self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params, dummy=dummy, bool_unsigned_invariants=True)
         
         # Resample model invariants to desired number of self.number_samples samples
         progress_values,model_invariants,progress_step = hf.resample_invariants(self.invariant_model,self.progress,self.number_samples)
@@ -268,7 +270,7 @@ class invariants_traj_gen_node:
             if all(np.isclose(self.pos_w_bottle,self.previous_pos_w_bottle,0,self.threshold_new_target_measurement)) and self.enter_recovery_mode == 0:
                 self.condition = 1
             else:
-                if self.debug_mode:
+                if self.debug_mode and self.enter_recovery_mode == 1:
                     print("New target detected, a new trajectory will be generated")
                 self.condition = 0
                 self.previous_pos_w_bottle = self.pos_w_bottle
@@ -292,10 +294,13 @@ class invariants_traj_gen_node:
             self.current_sample = hf.find_current_sample(self.tf[:3],self.current_traj.Obj_pos,self.number_samples)
 
             # Predict the robot pose in 100ms (ros node rate) by taking the model pose in self.delay_sample sample(s)
-            pos_w_tcp, R_w_tcp = hf.predict_robot_pose(self.delay_sample,self.jointvel,self.tf[:3],self.tf[3:],self.enter_recovery_mode,self.current_sample,self.current_traj.Obj_pos,self.current_traj.Obj_frames)
-
-            # s_prior,self.progress_sum = hf.progress_heuristic(self.previous_target,pos_w_tcp,self.pos_w_tgt,self.progress_fv,self.current_progress_offset)
+            pos_w_tcp, R_w_tcp = hf.predict_robot_pose(self.delay_sample,self.jointvel,self.tf[:3],self.tf[3:],self.enter_recovery_mode,self.current_sample,self.current_traj.Obj_pos,self.current_traj.Obj_frames,self.progress)
+            
+            # s_prior_old,_ = hf.progress_heuristic_old(self.previous_target,pos_w_tcp,self.pos_w_tgt,self.progress_fv,self.current_progress_offset)
             s_prior,self.progress_sum = hf.progress_heuristic(self.pos_w_tgt,pos_w_tcp,self.progress_fv,self.current_progress_offset,self.lookup_table,self.lookup_table_peak,)
+            if self.counter == 0:
+                s_prior = 0
+            # print("s_prior,counter,s_prior_old", s_prior, self.counter, s_prior_old)
 
             # new constraints TODO  
             alpha = 0
@@ -319,7 +324,7 @@ class invariants_traj_gen_node:
                     self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.current_traj.FSt_frames[self.current_sample+self.delay_sample])
                     self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.current_traj.FSr_frames[self.current_sample+self.delay_sample])
                 else:
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.current_traj.FSt_frames[self.current_sample-self.delay_sample])
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = Rot.from_euler('Z', np.pi).as_matrix() @ orthonormalize(self.current_traj.FSt_frames[self.current_sample-self.delay_sample]) # Rot.from_euler('Z', np.pi).as_matrix() @ 
                     self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.current_traj.FSr_frames[self.current_sample-self.delay_sample])
             self.boundary_constraints["moving-frame"]["translational"]["final"] = FSt_end
             self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
@@ -327,12 +332,20 @@ class invariants_traj_gen_node:
             self.initial_values["trajectory"]["position"] += self.home
 
             if self.enter_recovery_mode == 1 and self.counter > 0:
-                self.initial_values["trajectory"]["position"] = np.array([np.interp(np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=self.number_samples),np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_pos[round(s_prior*len(self.demo_pos)):,i]) for i in range(3)]).T
-                # self.initial_values["trajectory"]["orientation"] =
-                self.initial_values["moving-frame"]["translational"] = interpR(np.linspace(s_prior,1,self.number_samples),np.linspace(s_prior,1,len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_FSt[round(s_prior*len(self.demo_pos)):])
-                # self.initial_values["moving-frame"]["rotational"] =
+                vector_tcp_to_tgt = self.pos_w_tgt[:2] - pos_w_tcp[:2]
+                angle_tcp_to_tgt = np.arccos(np.dot(np.array([1,0]),vector_tcp_to_tgt)/(1*np.linalg.norm(vector_tcp_to_tgt)))
+                for k in range(self.number_samples):
+                    interp_initpos = np.array([np.interp(np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=self.number_samples),np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_pos[round(s_prior*len(self.demo_pos)):,i]) for i in range(3)]).T
+                    self.initial_values["trajectory"]["position"][k,:] = Rot.from_euler('z', angle_tcp_to_tgt if vector_tcp_to_tgt[1] >= 0 else -angle_tcp_to_tgt).as_matrix() @  interp_initpos[k,:]
+                    # self.initial_values["trajectory"]["position"] = np.array([np.interp(np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=self.number_samples),np.linspace(round(s_prior*len(self.demo_pos)),len(self.demo_pos)-1,num=len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_pos[round(s_prior*len(self.demo_pos)):,i]) for i in range(3)]).T
+                    # self.initial_values["trajectory"]["orientation"] =
+                    interp_initR = interpR(np.linspace(s_prior,1,self.number_samples),np.linspace(s_prior,1,len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_FSt[round(s_prior*len(self.demo_pos)):])
+                    self.initial_values["moving-frame"]["translational"][k] = Rot.from_euler('z', angle_tcp_to_tgt if vector_tcp_to_tgt[1] >= 0 else -angle_tcp_to_tgt).as_matrix() @ interp_initR[k]
+                    # self.initial_values["moving-frame"]["translational"] = interpR(np.linspace(s_prior,1,self.number_samples),np.linspace(s_prior,1,len(self.demo_pos)-round(s_prior*len(self.demo_pos))),self.demo_FSt[round(s_prior*len(self.demo_pos)):])
+                    # self.initial_values["moving-frame"]["rotational"] =
                 self.initial_values["invariants"] = model_invariants
-                self.initial_values["trajectory"]["position"] += self.home
+                self.initial_values["trajectory"]["position"] -= self.initial_values["trajectory"]["position"][0]
+                self.initial_values["trajectory"]["position"] += pos_w_tcp  # self.home
                 if self.debug_mode:
                     A = self.initial_values["trajectory"]["position"][0,:]
                     print(f"s_prior= {s_prior},init_pos start = {A}, first point old traj {self.new_traj.Obj_pos[0,:]}")
@@ -433,9 +446,13 @@ if __name__ == '__main__':
     # This defines the rate at which the node should publish
     rate = rospy.Rate(10) # 10hz
     while not rospy.is_shutdown():
+        starttime = time.time()
         inv_node.check_condition()
         if inv_node.condition == 0:
             inv_node.generate_trajectory()
         else:
             inv_node.reset_OCP()
+        endtime = time.time()
+        if endtime-starttime > 0.1:
+            print(f"WARNING! The node calculations exceeded the allocated 100ms. Total time: {endtime-starttime} s")
         rate.sleep()
