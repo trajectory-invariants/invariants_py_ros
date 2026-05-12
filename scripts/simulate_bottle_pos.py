@@ -33,6 +33,17 @@ class SimulateBottlePos:
         self.initial_bottle_position = MB2
         self.moved_bottle_position = LC2
 
+        self.initial_crate_position = np.zeros(3)
+        if self.initial_bottle_position[1] > 0.09:
+            self.initial_crate_position = np.array([0,0.3,0])
+        elif self.initial_bottle_position[1] < -0.09:
+            self.initial_crate_position = np.array([0,-0.3,0])
+        self.moved_crate_position = np.zeros(3)
+        if self.moved_bottle_position[1] > 0.09:
+            self.moved_crate_position = np.array([0,0.3,0])
+        elif self.moved_bottle_position[1] < -0.09:
+            self.moved_crate_position = np.array([0,-0.3,0])
+
         self.bottle_pos = np.array([0,0,0])
         self.initial_time = 0
         self.motion_duration = 7
@@ -42,6 +53,7 @@ class SimulateBottlePos:
         rospy.Subscriber('tf_pose', Float64MultiArray, self.callback_tf)
         rospy.Subscriber('progress', Float64MultiArray, self.callback_progress)
         self.pos_publisher = rospy.Publisher('/sim_bottle_pos_pub', Float64MultiArray, queue_size=10, latch=True)
+        self.crate_pos_publisher = rospy.Publisher('/sim_crate_pos_pub', Float64MultiArray, queue_size=10, latch=True)
 
 
     def callback_tf(self,data):
@@ -58,19 +70,24 @@ class SimulateBottlePos:
             if self.progress >= self.switching_progress or current_time >= self.switched_time:
                 if self.discrete_moving_tgt:
                     self.pos_home_bottle = self.moved_bottle_position
+                    self.pos_home_crate = self.moved_crate_position
                     self.switched_time = rospy.Time.now().to_sec()-self.initial_time
                 else:
                     if current_time - self.initial_time < self.motion_duration + self.switching_time:
                         self.pos_home_bottle = self.initial_bottle_position + (self.moved_bottle_position - self.initial_bottle_position)* (current_time - self.initial_time - self.switching_time)/(self.motion_duration)
             else:
                 self.pos_home_bottle = self.initial_bottle_position
+                self.pos_home_crate = self.initial_crate_position
         else:
             self.initial_time = rospy.Time.now().to_sec()
             self.pos_home_bottle = self.initial_bottle_position
+            self.pos_home_crate = self.initial_crate_position
 
         self.pos_w_bottle = self.pos_home_bottle + self.pos_w_home
+        self.pos_w_crate = self.pos_w_home + np.array([0.3-0.146,-0.265/2,-self.pos_w_home[2]])#self.pos_home_crate + self.pos_w_home
 
         self.pos_publisher.publish(Float64MultiArray(data=self.pos_w_bottle))
+        self.crate_pos_publisher.publish(Float64MultiArray(data=self.pos_w_crate))
 
 if __name__ == '__main__':
     
