@@ -79,7 +79,7 @@ class invariants_traj_gen_node:
         self.number_samples = 50
         self.threshold_new_target_measurement = 0.005
         self.delay_sample = 1
-        self.max_inv_err = 10
+        self.max_inv_err = 50
         self.debug_mode = True
 
 
@@ -97,11 +97,11 @@ class invariants_traj_gen_node:
         # Define OCP weights
         self.initial_w_high_start = round(0.7*self.number_samples)
         self.weights_params = {
-            "w_invars": 0.1/2*np.array([0.001*1, 0.001*1, 0.0001*1, 10, 1.0, 1.0]),
+            "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
             # "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 50, 10.0, 10.0]), # to use when include robot kin model
             "w_high_start": self.initial_w_high_start,
             "w_high_end": self.number_samples,
-            "w_high_invars": 0.5*np.array([0.001*1/10, 0.001*1/10, 0.001*1/10, 5, 1, 1]),
+            "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 5, 1, 1]),
             # "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 50, 10, 10]), # to use when include robot kin model
             "w_high_active": 1
         }
@@ -332,7 +332,7 @@ class invariants_traj_gen_node:
             self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
 
             self.initial_values["trajectory"]["position"] += self.home
-            # self.weights_params["w_high_start"] = round(((1-self.progress)-(1-self.initial_w_high_start/self.number_samples))/(1-self.progress)*self.number_samples) # ADAPT WHEN TO INCREASE WEIGHT BASED ON NEW PROGRESS?
+            self.weights_params["w_high_start"] = round(((1-s_prior)-(1-self.initial_w_high_start/self.number_samples))/(1-s_prior)*self.number_samples) # ADAPT WHEN TO INCREASE WEIGHT BASED ON NEW PROGRESS?
             # print("NEW WEIGHT", self.weights_params["w_high_start"])
 
             if self.enter_recovery_mode == 1 and self.counter > 0:
