@@ -84,7 +84,7 @@ class SimulateBottlePos:
             self.pos_home_crate = self.initial_crate_position
 
         self.pos_w_bottle = self.pos_home_bottle + self.pos_w_home
-        self.pos_w_crate = self.pos_w_home + np.array([0.3-0.146,-0.265/2,-self.pos_w_home[2]])#self.pos_home_crate + self.pos_w_home
+        self.pos_w_crate = self.pos_home_crate + self.pos_w_home + np.array([0.3-0.146,-0.265/2,-self.pos_w_home[2]])
 
         self.pos_publisher.publish(Float64MultiArray(data=self.pos_w_bottle))
         self.crate_pos_publisher.publish(Float64MultiArray(data=self.pos_w_crate))

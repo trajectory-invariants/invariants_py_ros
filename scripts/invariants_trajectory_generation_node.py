@@ -4,11 +4,10 @@ import rospy
 import json
 import numpy as np
 from std_msgs.msg import Float64MultiArray
-from std_msgs.msg import Float64
 from scipy.spatial.transform import Rotation as Rot
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
-from invariants_py.kinematics.orientation_kinematics import quat2rot, rot2quat
+from invariants_py.kinematics.orientation_kinematics import rot2quat
 from scipy.spatial.transform import Rotation as R
 from geometry_msgs.msg import Pose
 import std_msgs.msg
@@ -16,13 +15,13 @@ from invariants_py.kinematics.rigidbody_kinematics import orthonormalize_rotatio
 from invariants_py.ocp_initialization import initial_trajectory_movingframe_rotation as FSr_init
 from invariants_py.reparameterization import interpR
 from invariants_py.generate_trajectory import opti_generate_pose_traj_from_vector_invars as OCP_gen
-import invariants_py.spline_handler as sh
 from ros_spline_fitting_trajectory.msg import Trajectory
 import rospkg
 from invariants_py import data_handler as dh
 import helper_funtions as hf
 from scipy.spatial.transform import Rotation as Rot
 import time
+import matplotlib.pyplot as plt
 
 class OCP_results:
 
@@ -96,12 +95,13 @@ class invariants_traj_gen_node:
             "tip": 'TCP_frame' # Name of the robot tip (if empty standard 'tool0' is used)
         }
         # Define OCP weights
+        self.initial_w_high_start = round(0.7*self.number_samples)
         self.weights_params = {
-            "w_invars": 0.1/2*np.array([0.1*1, 0.1*1, 0.1*1, 5, 1.0, 1.0]),
+            "w_invars": 0.1/2*np.array([0.001*1, 0.001*1, 0.0001*1, 10, 1.0, 1.0]),
             # "w_invars": 0.1*np.array([0.1*1, 0.1*1, 0.1*1, 50, 10.0, 10.0]), # to use when include robot kin model
-            "w_high_start": round(0.7*self.number_samples),
+            "w_high_start": self.initial_w_high_start,
             "w_high_end": self.number_samples,
-            "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 5, 1, 1]),
+            "w_high_invars": 0.5*np.array([0.001*1/10, 0.001*1/10, 0.001*1/10, 5, 1, 1]),
             # "w_high_invars": 0.5*np.array([0.1*1/5, 0.1*1/5, 0.1*1/5, 50, 10, 10]), # to use when include robot kin model
             "w_high_active": 1
         }
@@ -212,7 +212,9 @@ class invariants_traj_gen_node:
         self.marker.action = self.marker.ADD
 
         # Set self.marker properties
-        self.marker.scale.x = 0.01
+        self.marker.scale.x = 0.003
+        self.marker.scale.y = 0.003
+        self.marker.scale.z = 0.003
         self.marker.color.a = 1.0
         self.marker.color.r = 1.0
 
@@ -317,19 +319,21 @@ class invariants_traj_gen_node:
             self.boundary_constraints["orientation"]["initial"] = R_w_tcp
             self.boundary_constraints["orientation"]["final"] = R_w_tgt # Start simple, where R_w_tgt is constant and equal to demo_Robj (for cf), TODO add variability in orientation!
             if self.counter == 0:
-                self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[round((self.current_sample)*len(self.demo_pos)/self.number_samples)])
-                self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[round((self.current_sample)*len(self.demo_pos)/self.number_samples)])
+                self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.demo_FSt[round(self.progress*len(self.demo_pos))]) # round((self.current_sample)*len(self.demo_pos)/self.number_samples)
+                self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.demo_FSr[round(self.progress*len(self.demo_pos))]) # round((self.current_sample)*len(self.demo_pos)/self.number_samples)
             else:
                 if self.enter_recovery_mode == 0:
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.current_traj.FSt_frames[self.current_sample+self.delay_sample])
-                    self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.current_traj.FSr_frames[self.current_sample+self.delay_sample])
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = orthonormalize(self.current_traj.FSt_frames[round(self.progress*self.number_samples)]) # self.current_sample+self.delay_sample
+                    self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.current_traj.FSr_frames[round(self.progress*self.number_samples)]) # self.current_sample+self.delay_sample
                 else:
-                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = Rot.from_euler('Z', np.pi).as_matrix() @ orthonormalize(self.current_traj.FSt_frames[self.current_sample-self.delay_sample]) # Rot.from_euler('Z', np.pi).as_matrix() @ 
-                    self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.current_traj.FSr_frames[self.current_sample-self.delay_sample])
+                    self.boundary_constraints["moving-frame"]["translational"]["initial"] = Rot.from_euler('Z', np.pi).as_matrix() @ orthonormalize(self.current_traj.FSt_frames[round(self.progress*self.number_samples)]) # Rot.from_euler('Z', np.pi).as_matrix() @  # [self.current_sample-self.delay_sample]
+                    self.boundary_constraints["moving-frame"]["rotational"]["initial"] = orthonormalize(self.current_traj.FSr_frames[round(self.progress*self.number_samples)]) # self.current_sample-self.delay_sample
             self.boundary_constraints["moving-frame"]["translational"]["final"] = FSt_end
             self.boundary_constraints["moving-frame"]["rotational"]["final"] = self.demo_FSr[-1]
 
             self.initial_values["trajectory"]["position"] += self.home
+            # self.weights_params["w_high_start"] = round(((1-self.progress)-(1-self.initial_w_high_start/self.number_samples))/(1-self.progress)*self.number_samples) # ADAPT WHEN TO INCREASE WEIGHT BASED ON NEW PROGRESS?
+            # print("NEW WEIGHT", self.weights_params["w_high_start"])
 
             if self.enter_recovery_mode == 1 and self.counter > 0:
                 vector_tcp_to_tgt = self.pos_w_tgt[:2] - pos_w_tcp[:2]
@@ -389,7 +393,7 @@ class invariants_traj_gen_node:
                     print("ENTERING RECOVERY MODE because:")
                     if not np.linalg.norm(self.pos_w_tgt - self.new_traj.Obj_pos[-1]) < 0.01:
                         print(f"- New trajectory doesn't reach the target, dist = {np.linalg.norm(self.pos_w_tgt - self.new_traj.Obj_pos[-1])} > 0.01")
-                    if inv_err >=30:
+                    if inv_err >=self.max_inv_err:
                         print(f"- Invariants error = {inv_err} >= {self.max_inv_err}")
                     if not np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp) < 0.02:
                         print(f"- New trajectory doesn't start at pos_w_tcp, dist = {np.linalg.norm(self.new_traj.Obj_pos[0,:]-pos_w_tcp)} > 0.02")
@@ -403,6 +407,11 @@ class invariants_traj_gen_node:
             # Plot invariants signature of first trajectory vs demonstration
             # if self.counter == 1:
             #     hf.plot_invariants(self.invariant_model,progress_values,self.new_traj.invariants)
+            #     fig = plt.figure()
+            #     ax3d = fig.add_subplot(111, projection='3d')
+            #     ax3d.plot(self.new_traj.Obj_pos[:,0],self.new_traj.Obj_pos[:,1],self.new_traj.Obj_pos[:,2],'o')
+            #     print(self.new_traj.Obj_pos)
+            #     plt.show()
 
             # Add points to the marker
             self.marker.points = []
@@ -444,7 +453,9 @@ if __name__ == '__main__':
     inv_node = invariants_traj_gen_node("talker")
 
     # This defines the rate at which the node should publish
-    rate = rospy.Rate(10) # 10hz
+    sampling_time_ms = 150 #ms
+    sampling_time = sampling_time_ms/1000
+    rate = rospy.Rate(1/sampling_time) # 10hz
     while not rospy.is_shutdown():
         starttime = time.time()
         inv_node.check_condition()
@@ -453,6 +464,6 @@ if __name__ == '__main__':
         else:
             inv_node.reset_OCP()
         endtime = time.time()
-        if endtime-starttime > 0.1:
-            print(f"WARNING! The node calculations exceeded the allocated 100ms. Total time: {endtime-starttime} s")
+        if endtime-starttime > sampling_time:
+            print(f"WARNING! The node calculations exceeded the allocated {sampling_time*1000}ms. Total time: {endtime-starttime} s")
         rate.sleep()
