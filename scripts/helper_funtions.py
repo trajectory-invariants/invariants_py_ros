@@ -66,6 +66,8 @@ def progress_heuristic(pos_w_tgt,pos_w_tcp,progress_fv,current_progress_offset,l
     else:
         s_prior = (np.argmin(np.array([round(abs(lookup_table[i]-dist_to_new_target),3) for i in range(peak)])))/len(lookup_table)
 
+    # s_prior += 0.1 # TESTING
+
     return s_prior,progress_sum
 
 def resample_invariants(invariant_model,progress,N=50):

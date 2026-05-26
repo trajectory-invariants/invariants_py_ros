@@ -79,8 +79,8 @@ class invariants_traj_gen_node:
         self.number_samples = 50
         self.threshold_new_target_measurement = 0.005
         self.delay_sample = 1
-        self.max_inv_err = 50
-        self.debug_mode = True
+        self.max_inv_err = 40
+        self.debug_mode = False
 
 
         # Solver choice
