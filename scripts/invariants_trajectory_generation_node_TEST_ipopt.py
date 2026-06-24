@@ -15,7 +15,6 @@ from invariants_py.kinematics.rigidbody_kinematics import orthonormalize_rotatio
 from invariants_py.ocp_initialization import initial_trajectory_movingframe_rotation as FSr_init
 from invariants_py.reparameterization import interpR
 from invariants_py.generate_trajectory import opti_generate_pose_traj_from_vector_invars as OCP_gen
-# from invariants_py.generate_trajectory import opti_generate_pose_traj_from_vector_invars_ipopt as OCP_gen_ipopt
 from ros_spline_fitting_trajectory.msg import Trajectory
 import rospkg
 from invariants_py import data_handler as dh
@@ -23,6 +22,10 @@ import helper_funtions as hf
 from scipy.spatial.transform import Rotation as Rot
 import time
 import matplotlib.pyplot as plt
+import casadi as cas
+import invariants_py.dynamics_vector_invariants as dynamics
+from invariants_py.ocp_helper import tril_vec, tril_vec_no_diag, extract_robot_params
+import urdf2casadi.urdfparser as u2c
 
 class OCP_results:
 
@@ -32,6 +35,227 @@ class OCP_results:
         self.Obj_pos = Obj_pos
         self.Obj_frames = Obj_frames
         self.invariants = invariants
+
+
+# class OCP_gen_pose:
+
+    # def __init__(self, boundary_constraints, init_vals, invariant_model, step_size, weights_params, N = 40, bool_unsigned_invariants = False, solver = 'ipopt', robot_params = {}, dummy = {}):  
+def generate_trajectory_ipopt(boundary_constraints, init_vals, invariant_model, step_size, weights_params, N = 40, bool_unsigned_invariants = False, solver = 'ipopt', robot_params = {}, dummy = {}):
+    # Robot urdf location
+    urdf_file_name = robot_params.get('urdf_file_name', None)
+    path_to_urdf = dh.find_robot_path(urdf_file_name) 
+    include_robot_model = True if path_to_urdf is not None else False
+    if include_robot_model:
+        nb_joints,q_limits,root,tip,q_init = extract_robot_params(robot_params,path_to_urdf,urdf_file_name)
+
+    dummy_inv_sol = dummy.get('inv_sol', 0.001+np.zeros((N,6)))
+    dummy_inv_demo = dummy.get('inv_demo', 0.001+np.zeros((N,6)))
+    dummy_R_t = dummy.get('R_t',np.array([np.hstack(np.eye(3)) for i in range(N)]).reshape(N,3,3))
+    dummy_R_r = dummy.get('R_r',np.array([np.hstack(np.eye(3)) for i in range(N)]).reshape(N,3,3))
+
+    ''' Create decision variables and parameters for the optimization problem '''
+    opti = cas.Opti() # use OptiStack package from Casadi for easy bookkeeping of variables 
+
+    # Define system states X (unknown object pose + moving frame pose at every time step) 
+    p_obj = []
+    R_obj = []
+    R_t = []
+    R_r = []
+    X = []
+    q = []
+    for k in range(N):
+        R_r.append(opti.variable(3,3)) # rotational Frenet-Serret frame
+        R_obj.append(opti.variable(3,3)) # object orientation
+        R_t.append(opti.variable(3,3)) # translational Frenet-Serret frame
+        p_obj.append(opti.variable(3,1)) # object position
+        if include_robot_model:
+            q.append(opti.variable(nb_joints,1))
+        X.append(cas.vertcat(cas.vec(R_r[k]), cas.vec(R_obj[k]),cas.vec(R_t[k]), cas.vec(p_obj[k])))
+    if include_robot_model:
+        epsilon = opti.variable(3,1) # slack variable for gap closing constraint
+
+
+    invars = []
+    qdot = []
+    for k in range(N-1):
+        invars.append(opti.variable(6,1)) # invariants
+        if include_robot_model:
+            qdot.append(opti.variable(nb_joints,1))
+
+    # Boundary values
+    if "position" in boundary_constraints and "initial" in boundary_constraints["position"]:
+        p_obj_start = opti.parameter(3,1)
+    if "position" in boundary_constraints and "final" in boundary_constraints["position"]:
+        p_obj_end = opti.parameter(3,1)
+    if "orientation" in boundary_constraints and "initial" in boundary_constraints["orientation"]:
+        R_obj_start = opti.parameter(3,3)
+    if "orientation" in boundary_constraints and "final" in boundary_constraints["orientation"]:
+        R_obj_end = opti.parameter(3,3)
+    if "moving-frame" in boundary_constraints and "translational" in boundary_constraints["moving-frame"] and "initial" in boundary_constraints["moving-frame"]["translational"]:
+        R_t_start = opti.parameter(3,3)
+    if "moving-frame" in boundary_constraints and "translational" in boundary_constraints["moving-frame"] and "final" in boundary_constraints["moving-frame"]["translational"]:
+        R_t_end = opti.parameter(3,3)
+    if "moving-frame" in boundary_constraints and "rotational" in boundary_constraints["moving-frame"] and "initial" in boundary_constraints["moving-frame"]["rotational"]:
+        R_r_start = opti.parameter(3,3)
+    if "moving-frame" in boundary_constraints and "rotational" in boundary_constraints["moving-frame"] and "final" in boundary_constraints["moving-frame"]["rotational"]:
+        R_r_end = opti.parameter(3,3)
+    
+    # Define system parameters P (known values in optimization that need to be set right before solving)
+    h = opti.parameter(1,1) # step size for integration of dynamic model
+    invars_demo = []
+    w_invars = []
+    for k in range(N-1):
+        invars_demo.append(opti.parameter(6,1)) # model invariants
+        w_invars.append(opti.parameter(6,1)) # weights for invariants
+    if include_robot_model:
+        q_lim = opti.parameter(nb_joints*2,1)
+
+
+    ''' Specifying the constraints '''
+    
+    # Constrain rotation matrices to be orthogonal (only needed for one timestep, property is propagated by integrator)
+    opti.subject_to(tril_vec(R_t[0].T @ R_t[0] - np.eye(3)) == 0)
+    opti.subject_to(tril_vec(R_obj[0].T @ R_obj[0] - np.eye(3)) == 0)
+    opti.subject_to(tril_vec(R_r[0].T @ R_r[0] - np.eye(3)) == 0)
+
+    # Boundary constraints
+    if "position" in boundary_constraints and "initial" in boundary_constraints["position"]:    
+        opti.subject_to(p_obj[0] == p_obj_start)
+    if "orientation" in boundary_constraints and "initial" in boundary_constraints["orientation"]:
+        opti.subject_to(tril_vec_no_diag(R_obj[0].T @ R_obj_start - np.eye(3)) == 0.)
+    if "moving-frame" in boundary_constraints and "translational" in boundary_constraints["moving-frame"] and "initial" in boundary_constraints["moving-frame"]["translational"]:
+        opti.subject_to(tril_vec_no_diag(R_t[0].T @ R_t_start - np.eye(3)) == 0.)
+    if "moving-frame" in boundary_constraints and "rotational" in boundary_constraints["moving-frame"] and "initial" in boundary_constraints["moving-frame"]["rotational"]:
+        opti.subject_to(tril_vec_no_diag(R_r[0].T @ R_r_start - np.eye(3)) == 0.)
+    if "position" in boundary_constraints and "final" in boundary_constraints["position"]:
+        if include_robot_model:
+            opti.subject_to(p_obj[-1] - p_obj_end == epsilon)
+        else:
+            opti.subject_to(p_obj[-1] == p_obj_end)
+    if "orientation" in boundary_constraints and "final" in boundary_constraints["orientation"]:
+        opti.subject_to(tril_vec_no_diag(R_obj[-1].T @ R_obj_end - np.eye(3)) == 0.)
+    if "moving-frame" in boundary_constraints and "translational" in boundary_constraints["moving-frame"] and "final" in boundary_constraints["moving-frame"]["translational"]:
+        opti.subject_to(tril_vec_no_diag(R_t[-1].T @ R_t_end - np.eye(3)) == 0.)
+    if "moving-frame" in boundary_constraints and "rotational" in boundary_constraints["moving-frame"] and "final" in boundary_constraints["moving-frame"]["rotational"]:
+        opti.subject_to(tril_vec_no_diag(R_r[-1].T @ R_r_end - np.eye(3)) == 0.)
+        
+    if include_robot_model:
+        for k in range(N):
+            for i in range(nb_joints):
+                # ocp.subject_to(-q_lim[i] <= (q[k][i] <= q_lim[i])) # This constraint definition does not work with fatrop, yet
+                opti.subject_to(q[k][i] >= q_lim[i])
+                opti.subject_to(q[k][i] <= q_lim[nb_joints+i])
+
+    # Dynamic constraints
+    integrator = dynamics.define_integrator_invariants_pose(h)
+    # p_obj_fwkin = np.zeros((3,N))
+    # R_obj_fwkin = np.zeros((3,3,N))
+    # integrator = dynamics.define_integrator_invariants_pose(h,include_robot_model)
+    for k in range(N-1):
+        # Integrate current state to obtain next state (next rotation and position)
+        Xk_end = integrator(X[k],invars[k],h)
+        # Gap closing constraint
+        opti.subject_to(X[k+1]==Xk_end)
+        if include_robot_model:
+            opti.subject_to(q[k+1]==qdot[k]*h+q[k])
+
+        
+    # Forward kinematics
+    if include_robot_model:
+        ur10 = u2c.URDFparser()
+        ur10.from_file(path_to_urdf)
+        fk_dict = ur10.get_forward_kinematics(root, tip)
+        robot_forward_kinematics = fk_dict["T_fk"]
+        q_sim = cas.MX.sym('q',nb_joints,1)
+        # pos_sim = cas.MX.sym('pos',3,1)
+        # R_sim = cas.MX.sym('R',3,3)
+
+        # T_sim = cas.vertcat(cas.horzcat(R_sim, pos_sim),)
+        T_sim = robot_forward_kinematics(q_sim.T)
+        pos_sim = T_sim[0:3,3]
+        R_sim = T_sim[0:3,0:3]
+        # p_obj_fwkin, R_obj_fwkin = robot_forward_kinematics(q[k],path_to_urdf,root,tip)
+        fw_kin = cas.Function('fw_kin', [q_sim], [pos_sim, R_sim])
+        for k in range(N):
+            p_obj_fwkin, R_obj_fwkin =  fw_kin(q[k])
+            opti.subject_to(p_obj[k] ==  p_obj_fwkin)
+            opti.subject_to(tril_vec_no_diag(R_obj[k].T @ R_obj_fwkin - np.eye(3)) == 0.)       
+            # opti.subject_to(tril_vec_no_diag(np.eye(3).T @ R_obj_fwkin - np.eye(3)) == 0.) # used for crate filling       
+
+    ''' Specifying the objective '''
+
+    # Fitting constraint to remain close to measurements
+    objective_fit = 0
+    for k in range(N-1):
+        err_invars = w_invars[k]*(invars[k] - invars_demo[k])
+        # err_invars = w_invars[k][3:]*(invars[k][3:] - invars_demo[k][3:]) # used for crate filling
+        objective_fit += 1/N*cas.dot(err_invars,err_invars)
+        # objective_fit += 1*cas.dot(err_invars,err_invars) # used for crate filling
+    objective = objective_fit
+
+    ''' Define solver and save variables '''
+    opti.minimize(objective)
+
+    if solver == 'ipopt':
+        opti.solver('ipopt',{"print_time":True,"expand":True},{'max_iter':100,'tol':1e-6,'print_level':0,'ma57_automatic_scaling':'no','linear_solver':'mumps','print_info_string':'yes'})
+    elif solver == 'fatrop':
+        opti.solver('fatrop',{"expand":True,'fatrop.max_iter':300,'fatrop.tol':1e-6,'fatrop.print_level':5, "structure_detection":"auto","debug":True,"fatrop.mu_init":0.1})
+
+    for k in range(N):
+        opti.set_initial(R_t[k], init_vals["moving-frame"]["translational"][k])
+        opti.set_initial(R_r[k], init_vals["moving-frame"]["translational"][k])
+        if include_robot_model:
+            p_obj_dummy, R_obj_dummy = fw_kin(q_init) #robot_forward_kinematics(q_init,path_to_urdf,root,tip)
+            opti.set_initial(q[k],q_init)
+            opti.set_value(q_lim,q_limits)
+        else:
+            p_obj_dummy = np.zeros(3)
+            R_obj_dummy = np.eye(3)
+        opti.set_initial(p_obj[k], init_vals["trajectory"]["position"][k])
+        opti.set_initial(R_obj[k], init_vals["trajectory"]["orientation"][k])
+    for k in range(N-1):
+        opti.set_initial(invars[k], init_vals["invariants"][k]) 
+        opti.set_value(invars_demo[k], invariant_model[k])
+        if weights_params["w_high_active"] == 1:
+            if k >= weights_params["w_high_start"] and k <= weights_params["w_high_end"]:
+                opti.set_value(w_invars[k], weights_params["w_high_invars"])
+            else:
+                opti.set_value(w_invars[k], weights_params["w_invars"])
+        else:
+            opti.set_value(w_invars[k], weights_params["w_invars"])
+        if include_robot_model:
+            opti.set_initial(qdot[k], 0.001*np.ones((nb_joints)))
+    opti.set_value(h,step_size)
+    # Boundary constraints
+    if "position" in boundary_constraints and "initial" in boundary_constraints["position"]:
+        opti.set_value(p_obj_start, boundary_constraints["position"]["initial"])
+    if "position" in boundary_constraints and "final" in boundary_constraints["position"]:
+        opti.set_value(p_obj_end, boundary_constraints["position"]["final"])
+    if "orientation" in boundary_constraints and "initial" in boundary_constraints["orientation"]:
+        opti.set_value(R_obj_start, boundary_constraints["orientation"]["initial"])
+    if "orientation" in boundary_constraints and "final" in boundary_constraints["orientation"]:
+        opti.set_value(R_obj_end, boundary_constraints["orientation"]["final"])
+        # opti.set_value(R_obj_end, rotate_x(np.pi/60) @ R_obj_dummy) # used for crate filling
+    if "moving-frame" in boundary_constraints and "translational" in boundary_constraints["moving-frame"] and "initial" in boundary_constraints["moving-frame"]["translational"]:
+        opti.set_value(R_t_start, boundary_constraints["moving-frame"]["translational"]["initial"])
+    if "moving-frame" in boundary_constraints and "translational" in boundary_constraints["moving-frame"] and "final" in boundary_constraints["moving-frame"]["translational"]:
+        opti.set_value(R_t_end, boundary_constraints["moving-frame"]["translational"]["final"])
+    if "moving-frame" in boundary_constraints and "rotational" in boundary_constraints["moving-frame"] and "initial" in boundary_constraints["moving-frame"]["rotational"]:
+        opti.set_value(R_r_start, boundary_constraints["moving-frame"]["rotational"]["initial"])
+    if "moving-frame" in boundary_constraints and "rotational" in boundary_constraints["moving-frame"] and "final" in boundary_constraints["moving-frame"]["rotational"]:
+        opti.set_value(R_r_end, boundary_constraints["moving-frame"]["rotational"]["final"])
+    sol = opti.solve_limited()
+
+    # Extract the solved variables
+    invariants = np.array([sol.value(i) for i in invars])
+    invariants =  np.vstack((invariants,[invariants[-1,:]]))
+    p_obj_sol = np.array([sol.value(i) for i in p_obj])
+    R_obj_sol = np.array([sol.value(i) for i in R_obj])
+    R_t_sol = np.array([sol.value(i) for i in R_t])
+    R_r_sol = np.array([sol.value(i) for i in R_r])
+    joint_val = []
+
+    return invariants, p_obj_sol, R_obj_sol, R_t_sol, R_r_sol, joint_val
 
 class invariants_traj_gen_node:
 
@@ -186,7 +410,6 @@ class invariants_traj_gen_node:
         self.current_traj = OCP_results(FSt_frames = [], FSr_frames = [], Obj_pos = 100*np.ones((self.number_samples,3)), Obj_frames = np.ones((self.number_samples,3,3))*np.eye(3), invariants = np.zeros((self.number_samples,6)))
 
         self.FS_online_generation_problem = OCP_gen.OCP_gen_pose(self.boundary_constraints,self.number_samples,solver=self.solver,robot_params=self.robot_params, dummy=dummy, bool_unsigned_invariants=True)
-        # self.FS_online_generation_problem = OCP_gen_ipopt.OCP_gen_pose(self.boundary_constraints,self.number_samples, dummy=dummy, bool_unsigned_invariants=True)
         
         # Resample model invariants to desired number of self.number_samples samples
         progress_values,model_invariants,progress_step = hf.resample_invariants(self.invariant_model,self.progress,self.number_samples)
@@ -363,9 +586,9 @@ class invariants_traj_gen_node:
             if self.debug_mode:
                 print("")
                 print("Generating new traj")
-            self.new_traj.invariants, self.new_traj.Obj_pos, self.new_traj.Obj_frames, self.new_traj.FSt_frames, self.new_traj.FSr_frames, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True,recovery_mode=self.enter_recovery_mode)
-            # self.new_traj.invariants, self.new_traj.Obj_pos, self.new_traj.Obj_frames, self.new_traj.FSt_frames, self.new_traj.FSr_frames, joint_values = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values)
-            # inv_err = 0.01
+            self.new_traj.invariants, self.new_traj.Obj_pos, self.new_traj.Obj_frames, self.new_traj.FSt_frames, self.new_traj.FSr_frames, joint_values = generate_trajectory_ipopt(self.boundary_constraints,self.initial_values,model_invariants,progress_step,self.weights_params,self.number_samples,True)
+            # self.new_traj.invariants, self.new_traj.Obj_pos, self.new_traj.Obj_frames, self.new_traj.FSt_frames, self.new_traj.FSr_frames, joint_values, inv_err = self.FS_online_generation_problem.generate_trajectory(model_invariants,self.boundary_constraints,progress_step,self.weights_params,self.initial_values,output_inverr=True,recovery_mode=self.enter_recovery_mode)
+            inv_err = 0.01
             if self.debug_mode:
                 print(f"Invariant error = {inv_err}")
 
@@ -463,15 +686,13 @@ if __name__ == '__main__':
     sampling_time = sampling_time_ms/1000
     rate = rospy.Rate(1/sampling_time) # 10hz
     while not rospy.is_shutdown():
+        starttime = time.time()
         inv_node.check_condition()
         if inv_node.condition == 0:
-            starttime = time.time()
             inv_node.generate_trajectory()
-            endtime = time.time()
-            if endtime-starttime > sampling_time:
-                print(f"WARNING! The node calculations exceeded the allocated {sampling_time*1000}ms. Total time: {endtime-starttime} s")
-            # else:
-            #     print(f"Total time: {endtime-starttime} s")
         else:
             inv_node.reset_OCP()
+        endtime = time.time()
+        if endtime-starttime > sampling_time:
+            print(f"WARNING! The node calculations exceeded the allocated {sampling_time*1000}ms. Total time: {endtime-starttime} s")
         rate.sleep()
