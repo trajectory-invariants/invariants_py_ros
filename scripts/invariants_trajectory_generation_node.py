@@ -76,6 +76,7 @@ class invariants_traj_gen_node:
         self.pub_node_output = rospy.Publisher('/raw_inv_gen_node_output', Float64MultiArray, queue_size=10, latch=True)
         self.publisher_trajectory = rospy.Publisher('/trajectory_pub', Trajectory, queue_size=10)
         self.publisher_traj_gen_marker = rospy.Publisher('/trajectory_marker', Marker, queue_size=10)
+        # self.pub_sphere_marker = rospy.Publisher('/sphere_marker', Marker, queue_size=10) # FOR OBSTACLE AVOIDANCE
         #%% User inputs
         self.number_samples = 50
         self.threshold_new_target_measurement = 0.005
@@ -220,6 +221,25 @@ class invariants_traj_gen_node:
         self.marker.color.a = 1.0
         self.marker.color.r = 1.0
 
+        # FOR OBSTACLE AVOIDANCE
+        # # Create the Marker message
+        # self.marker_sphere = Marker()
+        # self.marker_sphere.header = std_msgs.msg.Header()
+        # self.marker_sphere.header.frame_id = "world"
+        # self.marker_sphere.type = self.marker_sphere.SPHERE
+        # self.marker_sphere.action = self.marker_sphere.ADD
+
+        # # Set self.marker properties
+        # self.marker_sphere.scale.x = 0.1
+        # self.marker_sphere.scale.y = 0.1
+        # self.marker_sphere.scale.z = 0.1
+        # self.marker_sphere.color.a = 1.0
+        # self.marker_sphere.color.g = 1.0
+        # self.marker_sphere.pose.position.x = 0.345
+        # self.marker_sphere.pose.position.y = -0.202
+        # self.marker_sphere.pose.position.z = 0.6645
+        # self.pub_sphere_marker.publish(self.marker_sphere)
+
         if self.pos_w_tgt is None:
             print("Waiting for a target pose to be published on /sim_bottle_pos_pub topic...")
             rospy.wait_for_message('/sim_bottle_pos_pub', Pose)
@@ -298,7 +318,7 @@ class invariants_traj_gen_node:
             self.current_sample = hf.find_current_sample(self.tf[:3],self.current_traj.Obj_pos,self.number_samples)
 
             # Predict the robot pose in 100ms (ros node rate) by taking the model pose in self.delay_sample sample(s)
-            pos_w_tcp, R_w_tcp = hf.predict_robot_pose(self.delay_sample,self.jointvel,self.tf[:3],self.tf[3:],self.enter_recovery_mode,self.current_sample,self.current_traj.Obj_pos,self.current_traj.Obj_frames,self.progress)
+            pos_w_tcp, R_w_tcp = hf.predict_robot_pose(self.delay_sample,self.jointvel,self.tf[:3],self.tf[3:],self.enter_recovery_mode,self.current_sample,self.current_traj.Obj_pos,self.current_traj.Obj_frames,self.progress,self.number_samples)
             
             # s_prior_old,_ = hf.progress_heuristic_old(self.previous_target,pos_w_tcp,self.pos_w_tgt,self.progress_fv,self.current_progress_offset)
             s_prior,self.progress_sum = hf.progress_heuristic(self.pos_w_tgt,pos_w_tcp,self.progress_fv,self.current_progress_offset,self.lookup_table,self.lookup_table_peak,)

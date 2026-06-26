@@ -11,7 +11,7 @@ def find_current_sample(tf_pos,current_traj_pos,N=50):
     
     return current_sample
 
-def predict_robot_pose(delay_sample,jointvel,tf_pos,tf_quat,recovery_mode,current_sample,pos_current_traj,R_current_traj,current_progress):
+def predict_robot_pose(delay_sample,jointvel,tf_pos,tf_quat,recovery_mode,current_sample,pos_current_traj,R_current_traj,current_progress,N=50):
     # Predict the robot pose in 100ms (ros node rate) by taking the model pose in delay_sample sample(s)
     if all(abs(jointvel[i]) < 1e-6 for i in range(len(jointvel))):
         pos_w_tcp = np.array([tf_pos[0],tf_pos[1],tf_pos[2]])
@@ -32,8 +32,8 @@ def predict_robot_pose(delay_sample,jointvel,tf_pos,tf_quat,recovery_mode,curren
         #         pos_w_tcp = pos_current_traj[current_sample-delay_sample-1]
         #         R_w_tcp = R_current_traj[current_sample-delay_sample-1]
         # pos_w_tcp_test = np.array([np.interp(current_sample/50+0.08,np.linspace(0,1,num=50),pos_current_traj[:,i]) for i in range(3)])
-        pos_w_tcp = np.array([np.interp(current_progress,np.linspace(0,1,num=50),pos_current_traj[:,i]) for i in range(3)])
-        R_w_tcp = np.array([interpR([current_progress],np.linspace(0,1,num=50),R_current_traj)]).reshape(3,3)
+        pos_w_tcp = np.array([np.interp(current_progress,np.linspace(0,1,num=N),pos_current_traj[:,i]) for i in range(3)])
+        R_w_tcp = np.array([interpR([current_progress],np.linspace(0,1,num=N),R_current_traj)]).reshape(3,3)
         # print(pos_w_tcp,pos_w_tcp_test)
 
     return pos_w_tcp, R_w_tcp
@@ -66,7 +66,7 @@ def progress_heuristic(pos_w_tgt,pos_w_tcp,progress_fv,current_progress_offset,l
     else:
         s_prior = (np.argmin(np.array([round(abs(lookup_table[i]-dist_to_new_target),3) for i in range(peak)])))/len(lookup_table)
 
-    # s_prior += 0.1 # TESTING
+    s_prior -= 0.1 # TESTING
 
     return s_prior,progress_sum
 
