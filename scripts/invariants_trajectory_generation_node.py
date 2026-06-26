@@ -222,14 +222,13 @@ class invariants_traj_gen_node:
         self.marker.color.r = 1.0
 
         # FOR OBSTACLE AVOIDANCE
-        # # Create the Marker message
+        # Create the Marker message
         # self.marker_sphere = Marker()
         # self.marker_sphere.header = std_msgs.msg.Header()
         # self.marker_sphere.header.frame_id = "world"
         # self.marker_sphere.type = self.marker_sphere.SPHERE
         # self.marker_sphere.action = self.marker_sphere.ADD
-
-        # # Set self.marker properties
+        # Set self.marker properties
         # self.marker_sphere.scale.x = 0.1
         # self.marker_sphere.scale.y = 0.1
         # self.marker_sphere.scale.z = 0.1

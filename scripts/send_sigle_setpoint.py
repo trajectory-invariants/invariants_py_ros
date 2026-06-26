@@ -47,7 +47,6 @@ class SendSetPoint:
             if progress <= 1:
                 self.target_pos = [np.interp(progress,np.linspace(0,1,len(trajectory)),trajectory[:,i]) for i in range(3)]
             self.pos_publisher.publish(Float64MultiArray(data=self.target_pos))
-            print(self.target_pos)
 
             self.pub_node_output.publish(Float64MultiArray(data=self.inv_node_output))
         
@@ -59,7 +58,7 @@ if __name__ == '__main__':
     setpoint = SendSetPoint()
     
     # This defines the rate at which the node should publish
-    rate = rospy.Rate(5)
+    rate = rospy.Rate(6.666667) # setting same refresh rate of invariants OCP
     while not rospy.is_shutdown():
         setpoint.evaluate_set_point()
         rate.sleep()
