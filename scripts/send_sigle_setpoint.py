@@ -12,7 +12,7 @@ class SendSetPoint:
         self.tf = np.zeros(7)
         self.target_pos = np.zeros(3)
         self.initial_time = rospy.Time.now().to_sec()
-        self.desired_total_time = 9
+        self.desired_total_time = 7.8 # for LB1
         self.inv_node_output = np.ones(10)*100
         self.discrete_traj = None
 
